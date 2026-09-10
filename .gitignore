@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg
+
+# Test / tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Environment
+.env
+.env.local
+!.env.example
+
+# Data (never commit uploaded PDFs or vector DB)
+backend/data/uploads/
+backend/data/chroma_db/
+backend/data/*.db
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+.eslintcache
+
+# Logs
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ── Deliberately NOT ignored ─────────────────────────────────────────────────
+#
+# backend/tests/fixtures/*.pdf  (8 files, 157 KB total)
+#
+# These are committed on purpose, even though `make_fixtures.py` can regenerate
+# them. test_retriever.py asserts measured similarity scores against this exact
+# corpus (RELEVANT_SCORE_FLOOR = 0.50, UNRELATED_SCORE_CEILING = 0.30).
+# Regenerating with a different PyMuPDF version can shift glyph layout, hence
+# extracted text, hence embeddings, hence those scores — which would turn a
+# green suite red on a fresh clone for reasons that have nothing to do with the
+# code. 157 KB is a trivial repository cost for a test suite that runs
+# immediately after `git clone` with no extra steps. The generator stays
+# committed for provenance; the PDFs stay committed as the fixed reference
+# corpus.
