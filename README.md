@@ -11,11 +11,20 @@ document ever leaves it.
 **Stack:** FastAPI · Ollama (Llama 3.1 8B / Llama 3.2 — see [Choosing a model](#choosing-a-model)) ·
 sentence-transformers (all-MiniLM-L6-v2) · ChromaDB · SQLite · React + Vite + Tailwind CSS · Tesseract OCR
 
-> **Status:** Complete. Built over 10 days against `PROJECT_SPECIFICATION_v2.md`; all 21
-> required features implemented and all 33 items of the spec §32 completeness checklist
-> verified. See [`docs/`](docs/) for the per-day session records and
-> [`docs/FINAL_PROJECT_COMPLETION.md`](docs/FINAL_PROJECT_COMPLETION.md) for the final
-> verification.
+> **Status:** Feature-complete and verified; **not deployed**. Built over 10 days against
+> `PROJECT_SPECIFICATION_v2.md` — all 21 required features implemented and all 33 items of
+> the spec §32 completeness checklist verified — then taken through a post-coding
+> lifecycle: verification, hardening, and consolidation.
+>
+> | Phase | Record | Outcome |
+> |---|---|---|
+> | Build (10 days) | [`docs/SESSION_02…10`](docs/), [`FINAL_PROJECT_COMPLETION.md`](docs/FINAL_PROJECT_COMPLETION.md) | 21/21 features, 33/33 checklist |
+> | A — Verification | [`POSTCODING_DAY_01_VERIFICATION.md`](docs/POSTCODING_DAY_01_VERIFICATION.md) | Functional, integration, regression, clean-state gate |
+> | B — Hardening | [`POSTCODING_DAY_02_HARDENING.md`](docs/POSTCODING_DAY_02_HARDENING.md) | 9 defects found and fixed; performance, security, UI/UX, configuration |
+> | C — Consolidation | [`POSTCODING_DAY_03_CONSOLIDATION.md`](docs/POSTCODING_DAY_03_CONSOLIDATION.md) | Lint/type clean, docs reconciled, fresh-env install proven, production build verified |
+>
+> Release, deployment and monitoring (phases D–E) have **not** been done. See
+> [Known limitations](#known-limitations).
 
 ---
 
@@ -258,7 +267,7 @@ services and no external APIs.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Where Ollama is listening |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Where Ollama is listening. The literal IPv4 address is deliberate — see the note below the table |
 | `OLLAMA_MODEL` | `llama3.2:latest` | The generation model — see [Choosing a model](#choosing-a-model) |
 | `OLLAMA_TIMEOUT_SECONDS` | `300` | Generation timeout before a 503; covers cold model loading |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | sentence-transformers model (384-dim) |
@@ -276,6 +285,19 @@ services and no external APIs.
 | `OCR_DPI` | `300` | Render resolution for OCR |
 | `TESSERACT_CMD_PATH` | *(empty)* | Explicit path to the Tesseract binary if it is not on PATH |
 
+> **Why `OLLAMA_BASE_URL` is `127.0.0.1` and not `localhost`.** On Windows,
+> `localhost` resolves to `::1` before `127.0.0.1`, and Ollama binds IPv4 only. Every new
+> connection therefore waited for the IPv6 refusal before falling back — measured at
+> 2065 ms via `localhost` against 8.3 ms via `127.0.0.1`, paid on every health check and
+> every question. Point it at a hostname only if Ollama runs on another machine.
+
+> **Every numeric variable is range-checked at startup.** A value that is not a whole
+> number, or is below its minimum, stops the backend immediately with a message naming the
+> variable, instead of letting it start "healthy" and fail later during an upload or a
+> question. `CHUNK_OVERLAP` must also be strictly smaller than `CHUNK_SIZE`. The minimum
+> for each variable is documented inline in `.env.example`, and
+> [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) is the full reference.
+
 ---
 
 ## Running the tests
@@ -286,8 +308,19 @@ From `backend/`, with the virtual environment active:
 pytest tests/ -v
 ```
 
-Seven test modules: `test_text_cleaner.py`, `test_chunker.py`, `test_embedder.py`,
-`test_retriever.py`, `test_llm_service.py`, `test_ocr_processor.py`, `test_api.py`.
+**146 tests across nine modules** (all passing as of post-coding Day 3):
+
+| Module | Tests | Covers |
+|---|---|---|
+| `test_llm_service.py` | 72 | Context budget, prompt fencing, citation extraction, refusal detection, prompt-injection output guard |
+| `test_api.py` | 21 | Every endpoint and status code, bounded upload reads, multipart filename edge cases |
+| `test_config_validation.py` | 17 | Startup range/type checking of every numeric setting |
+| `test_text_cleaner.py` | 10 | Normalisation, control characters, header/footer stripping |
+| `test_retriever.py` | 8 | Ranking, scoring, document scoping *(needs the fixture corpus — see below)* |
+| `test_chunker.py` | 6 | Chunk size, overlap, metadata propagation |
+| `test_ocr_processor.py` | 5 | OCR fallback, disabled/unavailable degradation |
+| `test_embedder.py` | 4 | Embedding shape and determinism |
+| `test_concurrency.py` | 3 | Handlers run in the threadpool, so one question cannot freeze the server |
 
 No running Ollama is required — every test that would call the model stubs
 `llm_service.call_ollama`, so retrieval, context construction and citation extraction all
@@ -324,16 +357,41 @@ pdf-rag-chatbot/
 │   │   ├── services/    pdf_processor, text_cleaner, chunker, embedder,
 │   │   │                vector_store, retriever, llm_service, ocr_processor
 │   │   └── utils/       helpers.py
-│   ├── tests/           7 test modules + fixtures/ (8 PDFs + make_fixtures.py)
+│   ├── tests/           9 test modules + fixtures/ (8 PDFs + make_fixtures.py)
 │   ├── data/            uploads/, chroma_db/, pdf_chatbot.db   (git-ignored)
-│   ├── requirements.txt, .env.example
+│   ├── requirements.txt, .env.example, pyproject.toml
 ├── frontend/
-│   └── src/             App, main, 2 pages, 9 components, api.js, useChat.js
-└── docs/                SESSION_02 … SESSION_10, FINAL_PROJECT_COMPLETION.md
+│   ├── src/             App, main, 2 pages, 9 components, api.js, useChat.js
+│   └── .prettierrc, vite.config.js, tailwind.config.js
+├── .gitattributes       line-ending policy (LF in the repository)
+└── docs/                ARCHITECTURE, API_REFERENCE, CONFIGURATION,
+                         SESSION_02 … SESSION_10, POSTCODING_DAY_01 … 03,
+                         FINAL_PROJECT_COMPLETION
 ```
 
-16 backend app modules, 15 frontend modules, 7 test modules — matching spec §15.
+16 backend app modules, 15 frontend modules — matching spec §15. The test suite has grown
+from the 7 modules spec §15 lists to 9: `test_config_validation.py` and
+`test_concurrency.py` were added during post-coding hardening to guard defects found then.
 `PROJECT_SPECIFICATION_v2.md` has the full architecture.
+
+### Code quality
+
+Linting and formatting are configured but the tools are **not** project dependencies —
+they are developer tooling, so they are not in `requirements.txt` or `package.json`.
+Install them into a throwaway environment and run:
+
+```bash
+# Python — from backend/
+python -m venv ../.venv-tools && ../.venv-tools/Scripts/pip install ruff black mypy
+../.venv-tools/Scripts/ruff check app tests     # config in pyproject.toml
+../.venv-tools/Scripts/mypy app
+
+# JavaScript — from frontend/
+npx prettier --check "src/**/*.{js,jsx,css}"    # config in .prettierrc
+```
+
+Current state: **ruff clean, mypy clean (21 files), prettier clean.** `pyproject.toml`
+records which rule families are deliberately disabled and why.
 
 ---
 
@@ -380,12 +438,56 @@ These are recorded deliberately rather than hidden — each is a decision with a
   spec §15.1 module list, so it is kept rather than deleted.
 
 - **Single-user, local, no authentication.** Deliberate (spec §33): auth adds days
-  without improving the RAG pipeline, and the app binds to localhost.
+  without improving the RAG pipeline, and the app binds to localhost. Authentication,
+  authorisation and HTTPS all become mandatory if the deployment model ever changes, as
+  does disabling `/docs`, `/redoc` and `/openapi.json`.
+
+- **Not deployed, and not cloud-hostable as designed.** The LLM, the embedding model and
+  the vector store all run locally by design (zero cost, complete data privacy), which
+  needs a machine with enough RAM to hold the model resident — no free hosting tier
+  provides that. Swapping to a hosted model API is one service module and one environment
+  variable, because the model call sits behind a single interface.
+
+- **Backend dependencies have never been audited for CVEs.** `pip-audit` and `safety`
+  are not installed, so the 14 Python pins have not been checked against an advisory
+  database. Versions are pinned and proven to install cleanly, so reproducibility holds —
+  but this half of the security checklist is genuinely unmet, not passed.
+
+- **Six known frontend dependency advisories**, deliberately not fixed: 1 high + 3
+  moderate in `vite`/`esbuild`, 2 moderate in `react-router`. Every fix is a breaking
+  major upgrade (vite 5→8, react-router 6→7). All four vite/esbuild issues are
+  **dev-server only** and do not affect `vite build` output; both react-router issues are
+  unreachable here (no SSR, no user-controlled navigation targets).
+
+- **Prompt-injection defence stops disclosure, not influence.** The output guard blocks
+  verbatim recitation of the system prompt and its fence markers, but a model that
+  paraphrases can defeat a substring filter, and a poisoned document can still bias the
+  *content* of an answer — inherent to retrieval augmentation. Mitigation is controlling
+  what gets uploaded, which for a single-user local app is the user.
+
+> The full carried-forward list, with the reason each item was not closed, is in
+> [`POSTCODING_DAY_02_HARDENING.md`](docs/POSTCODING_DAY_02_HARDENING.md) §9 (13 items)
+> and [`POSTCODING_DAY_03_CONSOLIDATION.md`](docs/POSTCODING_DAY_03_CONSOLIDATION.md).
 
 ---
 
 ## Documentation
 
-- [`PROJECT_SPECIFICATION_v2.md`](../PROJECT_SPECIFICATION_v2.md) — the full specification
-- [`docs/FINAL_PROJECT_COMPLETION.md`](docs/FINAL_PROJECT_COMPLETION.md) — final verification, feature-by-feature
+**Reference**
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components, how they connect, data flow, and why each major choice was made
+- [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) — every endpoint, request and response shape, status codes, error cases
+- [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) — every variable, its default, what it controls, and how it is validated
+
+**Records**
+
+- [`docs/FINAL_PROJECT_COMPLETION.md`](docs/FINAL_PROJECT_COMPLETION.md) — final build verification, feature-by-feature
 - [`docs/SESSION_02_SETUP.md`](docs/) … [`SESSION_10_TESTING.md`](docs/) — one record per build day, including what broke and why
+- [`docs/POSTCODING_DAY_01_VERIFICATION.md`](docs/POSTCODING_DAY_01_VERIFICATION.md) — phase A: functional, integration, regression, clean-state gate
+- [`docs/POSTCODING_DAY_02_HARDENING.md`](docs/POSTCODING_DAY_02_HARDENING.md) — phase B: performance, security, UI/UX, configuration
+- [`docs/POSTCODING_DAY_03_CONSOLIDATION.md`](docs/POSTCODING_DAY_03_CONSOLIDATION.md) — phase C: cleanup, documentation, reproducibility, build
+
+**Specification** — `PROJECT_SPECIFICATION_v2.md` is the document this project was built
+against. It lives one level *above* the repository root and is deliberately not published:
+the repository is rooted at `pdf-rag-chatbot/` so that it contains exactly the application.
+It is referenced here by name rather than by link, because a link would 404 on GitHub.
