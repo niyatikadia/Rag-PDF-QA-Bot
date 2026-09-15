@@ -1,0 +1,113 @@
+# Tooling configuration for the backend.
+#
+# Added on post-coding Day 3 (Consolidation, stage 12). Until now the project
+# had no linter or formatter configuration at all, which meant "the linter is
+# clean" was not a statement anyone else could check: every tool would run with
+# its own defaults and produce a different answer. This file makes the standard
+# explicit and reproducible.
+#
+# This is configuration only. No application behaviour depends on it, and it is
+# not imported at runtime — the backend is run as `uvicorn app.main:app`, not as
+# an installed package, so there is deliberately no [project] or build-system
+# table here.
+
+# ── ruff — linting ───────────────────────────────────────────────────────────
+[tool.ruff]
+# 100, not ruff's default 88. The code was hand-formatted to roughly this
+# measure before any tool was introduced (longest line in app/ was 103), so 88
+# would report ~27 pre-existing lines as violations without any of them being
+# hard to read. The four lines that were genuinely over 100 were wrapped on
+# Day 3 instead of the limit being raised to hide them.
+line-length = 100
+target-version = "py313"
+extend-exclude = [".venv", "data", "tests/fixtures/make_fixtures.py"]
+
+[tool.ruff.lint]
+# The selection is the *correctness* half of ruff plus the parts of pycodestyle
+# that catch real mistakes. Stylistic rule families are deliberately left out
+# and the reasons are recorded below rather than left to be rediscovered.
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes — unused imports, unused variables, undefined names
+    "B",    # flake8-bugbear — likely bugs
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "RET",  # flake8-return
+    "RUF",  # ruff's own checks
+]
+
+# Rules deliberately NOT enabled, with the reason. These were each evaluated
+# against the real code on Day 3, not assumed.
+#
+#   I  (isort)        — import sorting. Would rewrite the import block of 16
+#                       files for no defect. The existing order is already
+#                       consistent (stdlib, third-party, app) and readable.
+#   UP (pyupgrade)    — would rewrite every `List`/`Dict`/`Optional` annotation
+#                       to `list`/`dict`/`X | None` across ~60 call sites. That
+#                       is a codebase-wide rewrite with no behaviour or
+#                       correctness benefit, i.e. refactoring, not cleanup.
+#   ARG               — unused function arguments. Every occurrence is a test
+#                       double that must match the signature of the real
+#                       function it replaces (`def fake_post(url, **kw)`);
+#                       removing the arguments would break the substitution.
+#   BLE (blind-except)— `except Exception` appears 13 times, and every one is a
+#                       deliberate degradation boundary: OCR unavailable, Chroma
+#                       unreachable, the embedding model missing. Each logs the
+#                       exception and returns a safe default rather than taking
+#                       the request down. Narrowing them would mean guessing the
+#                       exception types of four third-party libraries.
+
+ignore = [
+    # `file: UploadFile = File(...)` is FastAPI's documented dependency-injection
+    # idiom, not the mutable-default bug B008 exists to catch. FastAPI evaluates
+    # the call once at import and uses the result as a marker object.
+    "B008",
+    # zip() without strict=. The two occurrences are in test_chunker.py, pairing
+    # a list with its own tail to compare adjacent chunks, where the lists are
+    # unequal in length *by construction* and strict=True would raise.
+    "B905",
+    # itertools.pairwise() suggestion, same two lines. `zip(xs, xs[1:])` states
+    # the intent plainly in a test assertion.
+    "RUF007",
+    # Ambiguous unicode in *comments*. This codebase writes prose comments with
+    # real typographic punctuation (– — …), and RUF003 reads an EN DASH as a
+    # possible homoglyph for a hyphen. The rule exists to catch homoglyph
+    # smuggling in identifiers and string literals; RUF001 and RUF002 still
+    # enforce that where it matters. A comment cannot change behaviour, so the
+    # check buys nothing here and would penalise correctly written English.
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests build deliberately malformed input and shadow names to drive failure
+# paths; E741 is a single-character loop variable in a line-length assertion.
+"tests/*" = ["E741"]
+
+# ── black — formatting ───────────────────────────────────────────────────────
+# Declared so that anyone who runs black gets the project's measure rather than
+# black's default 88.
+#
+# IMPORTANT: the codebase is NOT currently black-formatted, and that is a
+# recorded decision rather than an oversight. Running black over it produces a
+# +661/-326 line diff that is entirely restyling: it wraps `results.append({…})`
+# in an extra level of parentheses and explodes multi-argument logging calls to
+# one argument per line. Neither change fixes a defect, and both read worse than
+# the existing hand-formatting. See docs/POSTCODING_DAY_03_CONSOLIDATION.md §1.
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+extend-exclude = '(\.venv|data)'
+
+# ── mypy — type checking ─────────────────────────────────────────────────────
+# Deliberately not in strict mode. The project has no type-stub coverage for
+# chromadb, sentence-transformers, pytesseract or PyMuPDF, so strict mode would
+# produce hundreds of import-related errors that say nothing about this code.
+# What is enabled is the part that found a real annotation gap on Day 3: the
+# Optional-attribute check that caught `file.filename.lower()` where Starlette
+# types `filename` as `str | None`.
+[tool.mypy]
+python_version = "3.13"
+ignore_missing_imports = true
+warn_unused_ignores = true
+exclude = '(^\.venv/|^data/|^tests/fixtures/)'
