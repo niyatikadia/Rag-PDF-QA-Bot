@@ -1,0 +1,38 @@
+# Line-ending policy.
+#
+# Added on post-coding Day 3 (Consolidation, stage 12). Until now the project
+# had no policy, and the files had drifted: 29 of the 31 Python files used LF
+# while backend/app/config.py and backend/app/services/vector_store.py used
+# CRLF. Nothing failed because of it, but it is the kind of inconsistency that
+# produces whole-file diffs the first time someone edits one of those two files
+# on another machine, which then hides the real change in the noise.
+#
+# `text=auto` normalises to LF in the repository and lets git check out the
+# platform's native ending. The two CRLF files were converted to LF on Day 3 so
+# that the working tree already matches what this policy would produce.
+
+* text=auto
+
+# Explicit for the source types this project actually contains, so the answer
+# does not depend on git's content heuristic.
+*.py    text eol=lf
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.toml  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+.env.example text eol=lf
+
+# Binary — never normalise. The test fixture PDFs in particular are committed
+# because test_retriever.py asserts similarity scores against their exact bytes
+# (see .gitignore); newline translation would corrupt them.
+*.pdf   binary
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.db    binary
+*.sqlite3 binary
