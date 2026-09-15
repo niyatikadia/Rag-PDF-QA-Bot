@@ -61,9 +61,10 @@ frontend/.env
 # Logs
 *.log
 
-# IDEs
+# IDEs and editor/agent tooling
 .vscode/
 .idea/
+.claude/
 *.swp
 
 # OS
