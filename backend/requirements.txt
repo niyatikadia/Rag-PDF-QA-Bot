@@ -1,0 +1,39 @@
+# Backend dependencies — spec §16.1.
+#
+# Reconciled on Day 10 (2026-09-09). Every pin below is the exact version that
+# is installed in backend/.venv and that the Day 9 verification actually ran
+# against: 83/83 tests green and all 33 spec §32 checklist items PASS.
+#
+# Why this file was rewritten: the original pins were written on Day 1 and never
+# reconciled, and 12 of the 14 had drifted from what was really installed. The
+# blocking one was `Pillow==10.3.0`, which has no wheel for Python 3.13 and fails
+# to build from source — and because that aborts the whole pip transaction,
+# nothing after it installed either. `pip install -r requirements.txt` therefore
+# could not succeed on a fresh Python 3.13 machine at all, which is exactly what
+# spec §27 Day 10 ("verify the README setup works from scratch") requires.
+#
+# Verified on Python 3.13.3 / Windows: a throwaway virtualenv installs this file
+# end to end, `pip check` reports no broken requirements, and every module below
+# imports. See docs/FINAL_PROJECT_COMPLETION.md for the captured output.
+#
+# Only the 14 direct dependencies from spec §16.1 are pinned. Transitive
+# packages (torch, transformers, numpy, …) are deliberately left to the resolver
+# so this stays a dependency list, not a lock file.
+#
+# System dependency, NOT installable with pip: the Tesseract OCR binary (spec
+# §18.2). `pytesseract` is only a wrapper. See README "Prerequisites".
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+PyMuPDF==1.28.2
+sentence-transformers==3.0.1
+chromadb==1.5.9
+langchain-text-splitters==1.1.2
+requests==2.34.2
+python-dotenv==1.2.3
+pydantic==2.13.5
+pytest==9.1.1
+httpx==0.28.1
+pytesseract==0.3.13
+Pillow==12.3.0
