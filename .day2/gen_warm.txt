@@ -1,0 +1,26 @@
+﻿==============================================================================
+STAGE 8 — GENERATION: /api/chat/ask over HTTP
+==============================================================================
+  Run `ollama stop <model>` immediately before this to make the
+  first sample a genuine cold start.
+    [warm   ]    44.9s  http=200  citations=0  answer=  62 chars    1.4 char/s   q='What is this document about?'
+    [warm   ]    51.2s  http=200  citations=3  answer=  76 chars    1.5 char/s   q='What keyword is used for retrieval'
+    [warm   ]    93.2s  http=200  citations=3  answer= 705 chars    7.6 char/s   q='Summarise the main points.'
+    [warm   ]    35.7s  http=200  citations=1  answer= 141 chars    3.9 char/s   q='What does the second page say?'
+    [warm   ]     8.8s  http=200  citations=0  answer=  62 chars    7.1 char/s   q='Which page mentions pineapple?'
+    [warm   ]    31.2s  http=200  citations=0  answer=  62 chars    2.0 char/s   q='What is this document about?'
+    [warm   ]    40.0s  http=200  citations=1  answer=  81 chars    2.0 char/s   q='What keyword is used for retrieval'
+    [warm   ]    85.0s  http=200  citations=3  answer= 855 chars   10.1 char/s   q='Summarise the main points.'
+    [warm   ]    57.3s  http=200  citations=1  answer= 177 chars    3.1 char/s   q='What does the second page say?'
+    [warm   ]    15.0s  http=200  citations=0  answer=  62 chars    4.1 char/s   q='Which page mentions pineapple?'
+    [warm   ]    57.1s  http=200  citations=0  answer=  62 chars    1.1 char/s   q='What is this document about?'
+    [warm   ]    65.3s  http=200  citations=1  answer= 124 chars    1.9 char/s   q='What keyword is used for retrieval'
+    [warm   ]   126.6s  http=200  citations=3  answer= 828 chars    6.5 char/s   q='Summarise the main points.'
+    [warm   ]    53.4s  http=200  citations=1  answer= 177 chars    3.3 char/s   q='What does the second page say?'
+
+  warm requests
+    n=14  min=8.8s  p50=51.2s  p95=93.2s  p99=126.6s  max=126.6s  mean=54.6s
+
+    output rate: p50=3.2 char/s over n=14  (min=1.1, max=10.1)
+    Latency tracks ANSWER LENGTH, not retrieval: retrieval is a flat ~36 ms of every one of these.
+    status codes: [200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200]
