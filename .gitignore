@@ -16,6 +16,31 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
+# Day 3 lint/format toolchain. Kept in its own environment, separate from
+# backend/.venv, so that installing ruff/black/mypy/vulture/radon cannot drift
+# the environment requirements.txt is reconciled against. Never committed:
+# it is developer tooling, not a project dependency.
+# Also covers .venv-repro-day3/, the throwaway environment the Day 3
+# reproducibility check builds and deletes.
+.venv-*/
+.day3/node_modules/
+
+# Post-coding harnesses. `.day2/` and `.day3/` ARE committed — they are the
+# evidence the POSTCODING_DAY_0*.md records cite, and a reader should be able
+# to re-run them. Three things inside them are excluded:
+#
+#   .day2/backup/  holds a copy of the LIVE corpus (the SQLite row store, the
+#                  ChromaDB vectors and 3 real uploaded PDFs) taken so Day 2
+#                  could restore the baseline after destructive probes. It is
+#                  user data, excluded for exactly the reason backend/data/ is.
+#   *.day2fix      stale copies of application source, kept only to diff
+#   *.before-day3  against during that day. The real files are tracked.
+#   .day2/*.out    captured server stdout — same category as *.log.
+.day2/backup/
+*.day2fix
+*.before-day3
+.day2/*.out
+
 # Environment
 .env
 .env.local
