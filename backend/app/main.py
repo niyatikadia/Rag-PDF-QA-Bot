@@ -4,15 +4,25 @@ Startup: init DB, load embedding model, configure CORS.
 """
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 
-from app.config import FRONTEND_ORIGIN
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from app.config import (
+    APP_ENV,
+    FRONTEND_DIST_DIR,
+    FRONTEND_ORIGIN,
+    IS_PRODUCTION,
+    LOG_LEVEL,
+)
 from app.models.database import init_db
 from app.routers import documents, chat, health
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -22,6 +32,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info("=== PDF RAG Chatbot — Starting up ===")
+    logger.info(
+        "Environment: %s | API docs: %s | Frontend: %s",
+        APP_ENV,
+        "disabled" if IS_PRODUCTION else "/docs",
+        f"served from {FRONTEND_DIST_DIR}" if SERVING_FRONTEND else "not served (dev server expected)",
+    )
 
     # Initialise SQLite schema
     init_db()
@@ -46,11 +62,17 @@ async def lifespan(app: FastAPI):
     logger.info("=== PDF RAG Chatbot — Shutting down ===")
 
 
+# In production the interactive docs are not mounted at all. Passing None to
+# these three arguments is what removes the routes; leaving them at their
+# defaults and merely "not linking to them" would leave them reachable.
 app = FastAPI(
     title="PDF RAG Chatbot API",
     description="GenAI Q&A over uploaded PDFs using Ollama + ChromaDB.",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
@@ -68,6 +90,45 @@ app.include_router(chat.router, prefix="/api")
 app.include_router(health.router, prefix="/api")
 
 
-@app.get("/", tags=["root"])
-async def root():
-    return {"message": "PDF RAG Chatbot API is running. Visit /docs for the API reference."}
+# ── Frontend ──────────────────────────────────────────────────────────────────
+# Registered last, so every /api route above is matched first and the catch-all
+# below can never shadow one.
+_dist = Path(FRONTEND_DIST_DIR)
+_dist_resolved = _dist.resolve()
+_index = _dist / "index.html"
+SERVING_FRONTEND = _index.is_file()
+
+if SERVING_FRONTEND:
+    # Hashed, immutable build output.
+    app.mount("/assets", StaticFiles(directory=_dist / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_frontend(full_path: str):
+        """
+        Serve the built single-page app, falling back to index.html so that a
+        client-side route (/documents) survives a page refresh.
+
+        An unmatched /api path must not fall through to here: returning the HTML
+        shell with a 200 for a mistyped endpoint would turn a clear 404 into a
+        JSON parse error in the client. It is re-raised as a real 404 instead.
+        """
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+
+        # full_path is user-controlled, so it is resolved and confirmed to be
+        # inside the build directory before anything is read. Without this,
+        # "../../.." escapes the bundle and turns a static handler into an
+        # arbitrary-file-read primitive.
+        if full_path:
+            candidate = (_dist / full_path).resolve()
+            if candidate.is_file() and candidate.is_relative_to(_dist_resolved):
+                return FileResponse(candidate)
+        return FileResponse(_index)
+
+else:
+
+    @app.get("/", tags=["root"])
+    async def root():
+        return {
+            "message": "PDF RAG Chatbot API is running. Visit /docs for the API reference."
+        }

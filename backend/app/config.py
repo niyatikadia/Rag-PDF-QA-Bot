@@ -60,6 +60,49 @@ def _int_env(name: str, default: str, minimum: int) -> int:
     return value
 
 
+# ── Runtime environment ──────────────────────────────────────────────────────
+# Development and production are different programs, and the difference is
+# declared here rather than inferred. In production the interactive API docs are
+# not mounted: /docs, /redoc and /openapi.json describe every endpoint and its
+# schema, which is useful on a developer's machine and is attack surface
+# anywhere else. This was carried as a known open item out of Day 2 ("must be
+# disabled if the service is ever exposed"); declaring the environment is what
+# makes that switch exist.
+APP_ENV: str = os.getenv("APP_ENV", "development").strip().lower()
+if APP_ENV not in ("development", "production"):
+    raise ConfigurationError(
+        f"APP_ENV must be 'development' or 'production', but is {APP_ENV!r}. "
+        f"Fix it in backend/.env (or unset it to use the default 'development')."
+    )
+
+IS_PRODUCTION: bool = APP_ENV == "production"
+
+_VALID_LOG_LEVELS = ("CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG")
+LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+if LOG_LEVEL not in _VALID_LOG_LEVELS:
+    raise ConfigurationError(
+        f"LOG_LEVEL must be one of {', '.join(_VALID_LOG_LEVELS)}, but is "
+        f"{LOG_LEVEL!r}. Fix it in backend/.env (or unset it for the default INFO)."
+    )
+
+# Where `vite build` writes the production bundle. When this directory contains
+# an index.html, the API also serves the frontend from it, so a deployment is
+# one process on one origin with no Node runtime and no CORS. When it does not,
+# the Vite dev server serves the frontend and proxies /api here, and nothing
+# below changes.
+#
+# Unlike the three data paths, a relative value here is resolved against the
+# backend package rather than the working directory. Those three are created at
+# import time and are expected to sit under whatever directory you run from;
+# this one points at a sibling of `backend/` whose location does not depend on
+# where uvicorn was started, so `../frontend/dist` means the same thing from
+# `backend/`, from the repository root, or from a service manager with no
+# meaningful working directory at all.
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_DIST_DIR: str = str(
+    (_BACKEND_ROOT / os.getenv("FRONTEND_DIST_DIR", "../frontend/dist")).resolve()
+)
+
 # ── LLM ─────────────────────────────────────────────────────────────────────
 # 127.0.0.1, deliberately, not "localhost" (measured Day 2).
 #
