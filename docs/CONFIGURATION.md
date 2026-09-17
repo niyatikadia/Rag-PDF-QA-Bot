@@ -4,8 +4,10 @@
 **Source of truth:** `backend/app/config.py` reads every variable listed here, and
 `backend/.env.example` documents each one inline and is a working configuration as-is.
 
-Written on post-coding Day 3. The variable set below was diffed both ways against
-`config.py` on Day 2 — **17 variables read by the code, 17 documented, sets identical**.
+Written on post-coding Day 3, updated on Day 4 when the three runtime-environment
+variables were added. The variable set below is diffed both ways against `config.py`
+by `.day2/config_audit.py`, re-run on Day 4 — **20 variables read by the code, 20 in
+`.env.example`, 20 in the live `.env`, sets identical**.
 
 ---
 
@@ -52,7 +54,36 @@ APIs. `.env` is git-ignored regardless — the habit is what protects the next p
 
 ---
 
-## The 17 variables
+## The 20 variables
+
+### Runtime environment
+
+| Variable | Default (`config.py`) | `.env.example` | Min | Controls |
+|---|---|---|---|---|
+| `APP_ENV` | `development` | same | — | `development` or `production`. Anything else stops startup |
+| `LOG_LEVEL` | `INFO` | same | — | `CRITICAL`, `ERROR`, `WARNING`, `INFO` or `DEBUG` |
+| `FRONTEND_DIST_DIR` | `../frontend/dist` | same | — | Built frontend bundle; served by the backend when it contains an `index.html` |
+
+`APP_ENV=production` changes two things, both of them deliberate:
+
+- **The interactive API documentation is not mounted.** `/docs`, `/redoc` and
+  `/openapi.json` publish every endpoint and every schema. That is useful on a
+  developer's machine and is attack surface anywhere else. The routes are removed
+  from the application, not merely unlinked.
+- It is the flag a deployment sets, so the difference between the development
+  program and the production one is declared rather than inferred.
+
+An unrecognised value is rejected at startup. The failure worth preventing is a
+typo like `APP_ENV=prod` reading as `development`, leaving the docs mounted on
+something the operator believes is production.
+
+`FRONTEND_DIST_DIR` is the one path here **not** resolved against your working
+directory — a relative value is resolved against `backend/`. A service manager may
+start uvicorn from anywhere, and resolving this against the working directory would
+make whether the frontend gets served depend on where the process happened to be
+launched. When the directory has no `index.html`, the backend serves only the API
+and expects the Vite dev server to serve the frontend and proxy `/api` — the normal
+development setup.
 
 ### LLM (Ollama)
 

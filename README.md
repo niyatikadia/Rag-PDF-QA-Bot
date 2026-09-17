@@ -11,10 +11,10 @@ document ever leaves it.
 **Stack:** FastAPI · Ollama (Llama 3.1 8B / Llama 3.2 — see [Choosing a model](#choosing-a-model)) ·
 sentence-transformers (all-MiniLM-L6-v2) · ChromaDB · SQLite · React + Vite + Tailwind CSS · Tesseract OCR
 
-> **Status:** Feature-complete and verified; **not deployed**. Built over 10 days against
-> `PROJECT_SPECIFICATION_v2.md` — all 21 required features implemented and all 33 items of
-> the spec §32 completeness checklist verified — then taken through a post-coding
-> lifecycle: verification, hardening, and consolidation.
+> **Status:** **v1.0.0 — released and deployed** (self-hosted, local). Built over 10 days
+> against `PROJECT_SPECIFICATION_v2.md` — all 21 required features implemented and all 33
+> items of the spec §32 completeness checklist verified — then taken through a post-coding
+> lifecycle: verification, hardening, consolidation and release.
 >
 > | Phase | Record | Outcome |
 > |---|---|---|
@@ -22,8 +22,16 @@ sentence-transformers (all-MiniLM-L6-v2) · ChromaDB · SQLite · React + Vite +
 > | A — Verification | [`POSTCODING_DAY_01_VERIFICATION.md`](docs/POSTCODING_DAY_01_VERIFICATION.md) | Functional, integration, regression, clean-state gate |
 > | B — Hardening | [`POSTCODING_DAY_02_HARDENING.md`](docs/POSTCODING_DAY_02_HARDENING.md) | 9 defects found and fixed; performance, security, UI/UX, configuration |
 > | C — Consolidation | [`POSTCODING_DAY_03_CONSOLIDATION.md`](docs/POSTCODING_DAY_03_CONSOLIDATION.md) | Lint/type clean, docs reconciled, fresh-env install proven, production build verified |
+> | D — Release | [`POSTCODING_DAY_04_RELEASE.md`](docs/POSTCODING_DAY_04_RELEASE.md), [`CHANGELOG.md`](CHANGELOG.md), [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Layered history, v1.0.0 tagged, deployed and verified in production mode |
 >
-> Release, deployment and monitoring (phases D–E) have **not** been done. See
+> **Deployed** means: production mode, one process serving both the API and the built
+> frontend on `127.0.0.1:8000`, interactive API docs not mounted, verified with a real
+> question end to end. It is **self-hosted and loopback-only** — a 2 GB local model does
+> not fit any free hosting tier, and there is no authentication, so it is not exposed to a
+> network. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the reasoning, the
+> persistence plan and the rollback plan.
+>
+> Monitoring and maintenance (phase E) have **not** been done. See
 > [Known limitations](#known-limitations).
 
 ---
@@ -152,6 +160,11 @@ uvicorn app.main:app --reload
 
 API at http://localhost:8000 · interactive docs at http://localhost:8000/docs
 
+> Those commands are the **development** setup: `--reload` on, API docs mounted, and the
+> frontend served separately by Vite. To run the released version instead — one process,
+> no API docs, frontend served by the backend — see
+> [Running in production](#running-in-production).
+
 `.env.example` is a working configuration as-is — copy it and edit nothing unless
 `tesseract --version` failed, in which case set `TESSERACT_CMD_PATH`. The
 `data/uploads/`, `data/chroma_db/` directories and the SQLite schema are all created
@@ -188,6 +201,34 @@ For a production bundle: `npm run build`.
 
 Then open http://localhost:5173, go to **Documents**, drop in a PDF, wait for **Ready**,
 and ask a question on the **Chat** tab.
+
+### Running in production
+
+The released version runs as **one process on one origin**: the backend serves the built
+frontend as well as the API, so there is no Node runtime, no second port and no CORS.
+
+```bash
+cd frontend && npm ci && npm run build && cd ..
+```
+
+Then, with Ollama running:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts\start-production.ps1
+```
+
+The script checks the virtual environment, `.env`, the built bundle and Ollama before it
+binds a port, then starts uvicorn with `APP_ENV=production`. The whole application is at
+**http://127.0.0.1:8000**.
+
+What changes in production: `/docs`, `/redoc` and `/openapi.json` are **not mounted**,
+`--reload` is off, and the frontend comes from `frontend/dist` rather than Vite.
+
+> `--host 127.0.0.1` is loopback-only and deliberate. There is no authentication, so
+> binding `0.0.0.0` would expose an open upload endpoint to the network.
+
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) covers the target decision, what persists
+across restarts, the rollback plan and the pre-deploy checklist.
 
 ---
 
@@ -229,7 +270,9 @@ better answers.
 
 ## API
 
-Base URL `http://localhost:8000`. Full interactive reference at `/docs`.
+Base URL `http://localhost:8000`. Full interactive reference at `/docs` in development —
+in production it is not mounted, and [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) is
+the written equivalent.
 
 | Method | Endpoint | Request | Success | Errors |
 |---|---|---|---|---|
@@ -308,12 +351,13 @@ From `backend/`, with the virtual environment active:
 pytest tests/ -v
 ```
 
-**146 tests across nine modules** (all passing as of post-coding Day 3):
+**167 tests across ten modules** (all passing as of post-coding Day 4):
 
 | Module | Tests | Covers |
 |---|---|---|
 | `test_llm_service.py` | 72 | Context budget, prompt fencing, citation extraction, refusal detection, prompt-injection output guard |
 | `test_api.py` | 21 | Every endpoint and status code, bounded upload reads, multipart filename edge cases |
+| `test_production_mode.py` | 21 | `APP_ENV`/`LOG_LEVEL` validation, API docs absent in production, SPA fallback, static path-traversal containment |
 | `test_config_validation.py` | 17 | Startup range/type checking of every numeric setting |
 | `test_text_cleaner.py` | 10 | Normalisation, control characters, header/footer stripping |
 | `test_retriever.py` | 8 | Ranking, scoring, document scoping *(needs the fixture corpus — see below)* |
@@ -438,15 +482,21 @@ These are recorded deliberately rather than hidden — each is a decision with a
   spec §15.1 module list, so it is kept rather than deleted.
 
 - **Single-user, local, no authentication.** Deliberate (spec §33): auth adds days
-  without improving the RAG pipeline, and the app binds to localhost. Authentication,
-  authorisation and HTTPS all become mandatory if the deployment model ever changes, as
-  does disabling `/docs`, `/redoc` and `/openapi.json`.
+  without improving the RAG pipeline, and the app binds to `127.0.0.1`. Authentication,
+  authorisation and HTTPS all become mandatory if the deployment model ever changes.
+  `--host 127.0.0.1` is the only thing keeping an unauthenticated upload endpoint off the
+  network; do not change it to `0.0.0.0` without adding auth and TLS first.
+  *(`/docs`, `/redoc` and `/openapi.json` are no longer part of this limitation — they are
+  not mounted when `APP_ENV=production`.)*
 
-- **Not deployed, and not cloud-hostable as designed.** The LLM, the embedding model and
-  the vector store all run locally by design (zero cost, complete data privacy), which
-  needs a machine with enough RAM to hold the model resident — no free hosting tier
-  provides that. Swapping to a hosted model API is one service module and one environment
-  variable, because the model call sits behind a single interface.
+- **Deployed only as a self-hosted local service; not cloud-hostable as designed.** The
+  LLM, the embedding model and the vector store all run locally by design (zero cost,
+  complete data privacy), which needs a machine with enough RAM to hold the model
+  resident — no free hosting tier provides that, and deploying there would yield a service
+  that passes a health check and fails every question. Swapping to a hosted model API is
+  one service module and one environment variable, because the model call sits behind a
+  single interface. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) §1 for the options
+  considered and why each was rejected.
 
 - **Backend dependencies have never been audited for CVEs.** `pip-audit` and `safety`
   are not installed, so the 14 Python pins have not been checked against an advisory
