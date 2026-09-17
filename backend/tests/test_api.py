@@ -36,6 +36,7 @@ def test_health_endpoint_exists():
     assert "status" in data
     assert "ollama_available" in data
     assert "ocr_available" in data
+    assert "database_available" in data
 
 
 def test_document_list_initially_empty():

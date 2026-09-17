@@ -58,4 +58,7 @@ class HealthStatus(BaseModel):
     chroma_available: bool
     embedding_model_loaded: bool
     ocr_available: bool              # [v2]
+    database_available: bool
+    uptime_seconds: Optional[float] = None
+    version: Optional[str] = None
     details: Optional[dict] = None

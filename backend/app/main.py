@@ -2,14 +2,17 @@
 main.py — FastAPI application factory.
 Startup: init DB, load embedding model, configure CORS.
 """
+import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import (
     APP_ENV,
@@ -21,11 +24,58 @@ from app.config import (
 from app.models.database import init_db
 from app.routers import documents, chat, health
 
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+_STARTUP_TIME: float = time.monotonic()
+
+
+class _JSONFormatter(logging.Formatter):
+    """Single-line JSON log records for production log aggregation."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info and record.exc_info[0] is not None:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry, default=str)
+
+
+def _configure_logging() -> None:
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, LOG_LEVEL))
+    handler = logging.StreamHandler()
+    if IS_PRODUCTION:
+        handler.setFormatter(_JSONFormatter())
+    else:
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        )
+    root.handlers = [handler]
+
+
+_configure_logging()
 logger = logging.getLogger(__name__)
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Log method, path, status and duration for every request."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path == "/api/health":
+            return await call_next(request)
+        start = time.monotonic()
+        response = await call_next(request)
+        duration_ms = (time.monotonic() - start) * 1000
+        logging.getLogger("app.access").info(
+            "%s %s %d %.0fms",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+        )
+        return response
 
 
 @asynccontextmanager
@@ -83,6 +133,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Request logging ──────────────────────────────────────────────────────────
+app.add_middleware(RequestLoggingMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(documents.router, prefix="/api")
