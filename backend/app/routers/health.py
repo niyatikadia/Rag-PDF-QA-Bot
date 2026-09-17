@@ -9,6 +9,7 @@ import time
 
 import requests
 from fastapi import APIRouter
+from app import __version__
 from app.models.schemas import HealthStatus
 from app.config import OLLAMA_BASE_URL, DATABASE_PATH
 
@@ -95,7 +96,7 @@ def health_check() -> HealthStatus:
         ocr_available=ocr_ok,
         database_available=db_ok,
         uptime_seconds=round(uptime, 1),
-        version="1.0.0",
+        version=__version__,
         details={
             "note": "ocr_available=false means Tesseract is not installed — "
                     "scanned PDFs will skip OCR fallback but the app still works."

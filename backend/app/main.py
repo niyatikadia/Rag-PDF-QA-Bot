@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app import __version__
 from app.config import (
     APP_ENV,
     FRONTEND_DIST_DIR,
@@ -118,7 +119,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="PDF RAG Chatbot API",
     description="GenAI Q&A over uploaded PDFs using Ollama + ChromaDB.",
-    version="1.0.0",
+    version=__version__,
     lifespan=lifespan,
     docs_url=None if IS_PRODUCTION else "/docs",
     redoc_url=None if IS_PRODUCTION else "/redoc",

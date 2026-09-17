@@ -11,6 +11,7 @@ import logging
 
 from fastapi.testclient import TestClient
 
+from app import __version__
 from app.main import app, _JSONFormatter, RequestLoggingMiddleware
 
 
@@ -39,8 +40,20 @@ def test_health_includes_uptime():
 
 
 def test_health_includes_version():
+    """
+    The reported version must be the one the running package declares.
+
+    Asserted against app.__version__ rather than a literal: with a literal here,
+    a release bump that missed routers/health.py would still be green, which is
+    the exact drift this field exists to expose.
+    """
     data = client.get("/api/health").json()
-    assert data["version"] == "1.0.0"
+    assert data["version"] == __version__
+
+
+def test_reported_version_matches_the_openapi_app_version():
+    """The FastAPI app and the health endpoint must not disagree about the version."""
+    assert app.version == __version__
 
 
 def test_health_status_requires_database():
