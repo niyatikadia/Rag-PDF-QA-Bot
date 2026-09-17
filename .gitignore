@@ -41,6 +41,13 @@ htmlcov/
 *.before-day3
 .day2/*.out
 
+# Audit report generated against the project (post-coding Day 6). It is a
+# working document about the repository rather than part of the application,
+# and the decision was taken deliberately to keep it out of the published
+# repository rather than to leave it untracked by accident — the schedule PDF
+# §10 requires every file in `git ls-files` to be one that was intended.
+PROJECT_COMPLETE_AUDIT_REPORT.pdf
+
 # Environment
 .env
 .env.local
