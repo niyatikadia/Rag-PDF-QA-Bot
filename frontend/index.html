@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Served from frontend/public/, which Vite copies to the root of the
+         build. Declared explicitly rather than relying on the browser's
+         implicit /favicon.ico request: in production the backend serves the SPA
+         catch-all, so an undeclared /favicon.ico is answered with index.html
+         (HTTP 200, text/html) instead of a 404, and the browser shows a
+         broken-icon default while looking like the request succeeded. -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>PDF Q&amp;A Chatbot</title>
   </head>
   <body>
