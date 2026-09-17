@@ -21,6 +21,7 @@ import io
 import json
 import re
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -151,12 +152,17 @@ def sec_path_traversal():
     record("path", "every stored file is named by a generated UUID",
            not bad, f"{len(new)} new file(s); non-UUID names: {bad or 'none'}")
 
+    # Where a traversal payload would land if the upload handler honoured the
+    # user-supplied name. Derived from BACKEND rather than written as absolute
+    # paths, so the probe checks the right locations on any checkout; the
+    # system temp directory is resolved rather than assumed to be C:\Windows\Temp.
     escaped = []
-    for probe in [Path(r"C:\Windows\Temp\day2_pwned.pdf"),
-                  Path(r"C:\Windows\Temp\day2_abs.pdf"),
+    for probe in [Path(tempfile.gettempdir()) / "day2_pwned.pdf",
+                  Path(tempfile.gettempdir()) / "day2_abs.pdf",
                   BACKEND / "data" / "day2_pwned.pdf",
                   BACKEND / "day2_pwned.pdf",
-                  Path(r"C:\RAGPDFQABOT\day2_pwned.pdf")]:
+                  BACKEND.parent / "day2_pwned.pdf",
+                  BACKEND.parent.parent / "day2_pwned.pdf"]:
         if probe.exists():
             escaped.append(str(probe))
     record("path", "nothing was written outside the upload directory",

@@ -14,9 +14,20 @@
 # Stated as such in the report rather than presented as a from-disk cold start.
 
 $ErrorActionPreference = 'Stop'
-$backend = 'C:\RAGPDFQABOT\pdf-rag-chatbot\backend'
-$py = "$backend\.venv\Scripts\python.exe"
-$log = 'C:\RAGPDFQABOT\pdf-rag-chatbot\.day2\backend.log'
+
+# Paths are derived from this script's own location, not hard-coded. This file
+# is published in the repository as the evidence behind the cold-start numbers
+# in POSTCODING_DAY_02_HARDENING.md, and a harness wired to one machine's
+# absolute path is a measurement nobody else can reproduce.
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path      # <repo>\.day2
+$repo = Split-Path -Parent $here                             # <repo>
+$backend = Join-Path $repo 'backend'
+$py = Join-Path $backend '.venv\Scripts\python.exe'
+$log = Join-Path $here 'backend.log'
+
+if (-not (Test-Path $py)) {
+    throw "Backend virtual environment not found at $py. Create it first (see README 'Backend')."
+}
 
 # Make sure nothing is already holding the port.
 Get-Process python -ErrorAction SilentlyContinue |
