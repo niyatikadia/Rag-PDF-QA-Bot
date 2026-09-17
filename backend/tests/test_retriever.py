@@ -1,9 +1,9 @@
 """
 test_retriever.py — Unit tests for retriever.py and vector_store.query_chunks
-Implemented: Day 4.
+Implemented: Day 4. Decoupled from the live store on post-coding Day 6.
 
-These run against the persisted ChromaDB store (CHROMA_PERSIST_DIR), which
-already holds the three sample documents ingested end-to-end in Day 3:
+These run against the **isolated** corpus built by conftest.py from the
+committed fixture PDFs, not against the developer's ChromaDB store:
 
   native_single.pdf        1 page,  native text
   native_multi.pdf         3 pages, native text, one distinct topic per page
@@ -11,20 +11,13 @@ already holds the three sample documents ingested end-to-end in Day 3:
   scanned_image_only.pdf   1 page,  image-only, recovered via OCR
                            (contains "PINEAPPLE OCR SUCCESS")
 
-Total: 5 chunks. Re-ingesting is not required — see SESSION_04_INGESTION_COMPLETE.md.
+Nothing has to be uploaded first, and uploading anything through the running
+application cannot affect these results. See conftest.py for why that changed.
 """
 import pytest
 
 from app.services import vector_store
 from app.services.retriever import retrieve, distance_to_score
-
-# Documents the Day 3 session left in the store.
-EXPECTED_FILENAMES = {
-    "native_single.pdf",
-    "native_multi.pdf",
-    "scanned_image_only.pdf",
-}
-EXPECTED_CHUNK_COUNT = 5
 
 # Score bands measured against this corpus: an on-topic query tops out around
 # 0.58-0.79, an off-topic one around 0.06-0.08. The thresholds sit well inside
@@ -33,37 +26,25 @@ RELEVANT_SCORE_FLOOR = 0.50
 UNRELATED_SCORE_CEILING = 0.30
 
 
-@pytest.fixture(scope="module")
-def sample_docs():
+def test_corpus_was_built_from_the_committed_fixtures(fixture_corpus):
     """
-    Map filename → document_id for the Day 3 sample documents.
-
-    Fails loudly (rather than skipping) if the store is missing them, since
-    a wiped store means retrieval is untested, not that it's fine.
+    Guards the fixture itself: if ingestion silently produced nothing, every
+    assertion below would still pass against an empty store for the wrong
+    reason.
     """
-    collection = vector_store.get_collection()
-    stored = collection.get(include=["metadatas"])
-    metadatas = stored.get("metadatas") or []
-
-    by_filename = {m["filename"]: m["document_id"] for m in metadatas}
-    missing = EXPECTED_FILENAMES - set(by_filename)
-    if missing:
-        pytest.fail(
-            f"Sample documents missing from ChromaDB: {sorted(missing)}. "
-            "Re-upload the Day 3 test PDFs (see docs/SESSION_04_INGESTION_COMPLETE.md) "
-            "before running the retriever tests."
-        )
-    return by_filename
+    assert fixture_corpus["native_single.pdf"]["chunks"] == 1
+    assert fixture_corpus["native_multi.pdf"]["pages"] == 3
+    assert fixture_corpus["native_multi.pdf"]["chunks"] == 3
 
 
-def test_returns_top_k_results(sample_docs):
+def test_returns_top_k_results(sample_docs, corpus_chunk_count):
     """retrieve() must honour top_k, and cap at the number of stored chunks."""
     assert len(retrieve("artificial intelligence", top_k=1)) == 1
     assert len(retrieve("artificial intelligence", top_k=3)) == 3
 
     # top_k larger than the store returns everything available, not an error.
     everything = retrieve("artificial intelligence", top_k=99)
-    assert len(everything) == EXPECTED_CHUNK_COUNT
+    assert len(everything) == corpus_chunk_count
 
     # Every result carries the documented shape.
     for result in everything:
@@ -75,12 +56,13 @@ def test_returns_top_k_results(sample_docs):
             assert field in result["metadata"]
 
 
-def test_relevance_ordering(sample_docs):
+def test_relevance_ordering(sample_docs, corpus_chunk_count):
     """Results are ranked best-first, and an on-topic query surfaces the right chunk."""
     results = retrieve(
-        "history of artificial intelligence research since the 1950s", top_k=5
+        "history of artificial intelligence research since the 1950s",
+        top_k=corpus_chunk_count,
     )
-    assert len(results) == EXPECTED_CHUNK_COUNT
+    assert len(results) == corpus_chunk_count
 
     scores = [r["score"] for r in results]
     assert scores == sorted(scores, reverse=True), f"not ranked by score: {scores}"
@@ -98,15 +80,16 @@ def test_relevance_ordering(sample_docs):
     assert ocr_topic[0]["score"] >= RELEVANT_SCORE_FLOOR
 
 
-def test_unrelated_query_returns_low_scores(sample_docs):
+def test_unrelated_query_returns_low_scores(sample_docs, corpus_chunk_count):
     """An off-topic question still returns chunks, but with clearly low relevance."""
-    relevant = retrieve("What is ChromaDB used for?", top_k=5)
+    relevant = retrieve("What is ChromaDB used for?", top_k=corpus_chunk_count)
     unrelated = retrieve(
-        "How do I bake a chocolate chip cookie with butter and sugar?", top_k=5
+        "How do I bake a chocolate chip cookie with butter and sugar?",
+        top_k=corpus_chunk_count,
     )
 
     # Nothing is filtered out — scoring is the caller's cue, not an empty list.
-    assert len(unrelated) == EXPECTED_CHUNK_COUNT
+    assert len(unrelated) == corpus_chunk_count
     assert unrelated[0]["score"] < UNRELATED_SCORE_CEILING
     assert unrelated[0]["score"] < relevant[0]["score"]
 
@@ -135,8 +118,13 @@ def test_empty_query_returns_empty_list(sample_docs):
     assert retrieve("   \n\t ", top_k=5) == []
 
 
-def test_document_id_filter(sample_docs):
+def test_document_id_filter(sample_docs, corpus_has_ocr):
     """document_id restricts retrieval to a single document."""
+    if not corpus_has_ocr:
+        pytest.skip(
+            "Tesseract is not available, so scanned_image_only.pdf contributed no "
+            "chunks to the corpus. This asserts retrieval across the OCR document."
+        )
     multi_id = sample_docs["native_multi.pdf"]
     scanned_id = sample_docs["scanned_image_only.pdf"]
     question = "What was the keyword for retrieval testing in the scanned document?"
@@ -160,8 +148,13 @@ def test_document_id_filter(sample_docs):
     assert retrieve(question, top_k=5, document_id="no-such-document-id") == []
 
 
-def test_ocr_chunk_retrievable_with_correct_metadata(sample_docs):
+def test_ocr_chunk_retrievable_with_correct_metadata(sample_docs, corpus_has_ocr):
     """OCR-derived text is searchable and tagged extraction_method='ocr'."""
+    if not corpus_has_ocr:
+        pytest.skip(
+            "Tesseract is not available — the scanned fixture produced no OCR text, "
+            "so there is no OCR-derived chunk to retrieve."
+        )
     results = retrieve(
         "What was the keyword for retrieval testing in the scanned document?", top_k=5
     )

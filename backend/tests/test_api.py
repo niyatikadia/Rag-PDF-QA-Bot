@@ -236,7 +236,7 @@ def test_ask_whitespace_question_returns_400():
 # HTTP call to the model is faked. End-to-end answers against the live model are
 # verified manually (see docs/SESSION_06_RAG_PIPELINE_COMPLETE.md).
 
-def test_ask_returns_answer_and_citations(monkeypatch):
+def test_ask_returns_answer_and_citations(monkeypatch, fixture_corpus):
     monkeypatch.setattr(
         llm_service, "call_ollama",
         lambda *a, **kw: "The documents describe a test page (native_single.pdf, Page 1).",
@@ -247,12 +247,12 @@ def test_ask_returns_answer_and_citations(monkeypatch):
 
     assert response.status_code == 200
     data = response.json()
-    # Retrieval runs for real, so this needs the Day 3 sample PDFs in ChromaDB.
-    # Without them the endpoint correctly short-circuits to the F11 answer —
-    # which would fail here for a reason that has nothing to do with the API.
+    # Retrieval runs for real. The corpus it searches is the isolated one
+    # conftest.py builds from the committed fixtures, so this no longer depends
+    # on anything having been uploaded through the application first.
     assert data["answer"] != llm_service.NOT_FOUND_PHRASE, (
-        "Nothing was retrieved — re-ingest the Day 3 sample PDFs "
-        "(native_single.pdf, native_multi.pdf, scanned_image_only.pdf)."
+        "Nothing was retrieved from the fixture corpus — conftest.py's "
+        "ingestion produced no chunks, which is a fixture failure, not an API one."
     )
     assert "test page" in data["answer"]
     assert isinstance(data["citations"], list)
