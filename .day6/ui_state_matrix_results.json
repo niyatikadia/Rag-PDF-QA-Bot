@@ -1,0 +1,399 @@
+{
+  "findings": [
+    {
+      "state": "documents-empty",
+      "viewport": "375",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 375 vs viewport 375)"
+    },
+    {
+      "state": "documents-empty",
+      "viewport": "375",
+      "check": "empty state is explained, not blank",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-error",
+      "viewport": "375",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 375 vs viewport 375)"
+    },
+    {
+      "state": "documents-error",
+      "viewport": "375",
+      "check": "invalid file is refused with a visible message",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-uploading",
+      "viewport": "375",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 375 vs viewport 375)"
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "375",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 375 vs viewport 375)"
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "375",
+      "check": "OCR badge shown for OCR-derived documents",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "375",
+      "check": "per-document OCR page count shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "375",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 375 vs viewport 375)"
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "375",
+      "check": "chat empty state explains what to do",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "375",
+      "check": "keyboard focus reaches an interactive element",
+      "ok": true,
+      "detail": "(first Tab -> TEXTAREA)"
+    },
+    {
+      "state": "documents-empty",
+      "viewport": "768",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 768 vs viewport 768)"
+    },
+    {
+      "state": "documents-empty",
+      "viewport": "768",
+      "check": "empty state is explained, not blank",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-error",
+      "viewport": "768",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 768 vs viewport 768)"
+    },
+    {
+      "state": "documents-error",
+      "viewport": "768",
+      "check": "invalid file is refused with a visible message",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-uploading",
+      "viewport": "768",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 768 vs viewport 768)"
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "768",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 768 vs viewport 768)"
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "768",
+      "check": "OCR badge shown for OCR-derived documents",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "768",
+      "check": "per-document OCR page count shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "768",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 768 vs viewport 768)"
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "768",
+      "check": "chat empty state explains what to do",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "768",
+      "check": "keyboard focus reaches an interactive element",
+      "ok": true,
+      "detail": "(first Tab -> TEXTAREA)"
+    },
+    {
+      "state": "documents-empty",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "documents-empty",
+      "viewport": "1280",
+      "check": "empty state is explained, not blank",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-error",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "documents-error",
+      "viewport": "1280",
+      "check": "invalid file is refused with a visible message",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-uploading",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "1280",
+      "check": "OCR badge shown for OCR-derived documents",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "documents-ready",
+      "viewport": "1280",
+      "check": "per-document OCR page count shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "1280",
+      "check": "chat empty state explains what to do",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-empty",
+      "viewport": "1280",
+      "check": "keyboard focus reaches an interactive element",
+      "ok": true,
+      "detail": "(first Tab -> TEXTAREA)"
+    },
+    {
+      "state": "chat-loading",
+      "viewport": "375",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 375 vs viewport 375)"
+    },
+    {
+      "state": "chat-loading",
+      "viewport": "375",
+      "check": "escalating loading indicator is shown",
+      "ok": true,
+      "detail": "(['Searching your documents'])"
+    },
+    {
+      "state": "chat-error",
+      "viewport": "375",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 375 vs viewport 375)"
+    },
+    {
+      "state": "chat-error",
+      "viewport": "375",
+      "check": "failure is surfaced with an actionable message",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-error",
+      "viewport": "375",
+      "check": "failed turn offers Retry rather than vanishing",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-loading",
+      "viewport": "768",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 768 vs viewport 768)"
+    },
+    {
+      "state": "chat-loading",
+      "viewport": "768",
+      "check": "escalating loading indicator is shown",
+      "ok": true,
+      "detail": "(['Searching your documents'])"
+    },
+    {
+      "state": "chat-error",
+      "viewport": "768",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 768 vs viewport 768)"
+    },
+    {
+      "state": "chat-error",
+      "viewport": "768",
+      "check": "failure is surfaced with an actionable message",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-error",
+      "viewport": "768",
+      "check": "failed turn offers Retry rather than vanishing",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-loading",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "chat-loading",
+      "viewport": "1280",
+      "check": "escalating loading indicator is shown",
+      "ok": true,
+      "detail": "(['Searching your documents'])"
+    },
+    {
+      "state": "chat-error",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "chat-error",
+      "viewport": "1280",
+      "check": "failure is surfaced with an actionable message",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-error",
+      "viewport": "1280",
+      "check": "failed turn offers Retry rather than vanishing",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-loading",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "chat-answered",
+      "viewport": "1280",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 1280 vs viewport 1280)"
+    },
+    {
+      "state": "chat-answered",
+      "viewport": "1280",
+      "check": "answer renders with a citation card",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "state": "chat-answered",
+      "viewport": "768",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 768 vs viewport 768)"
+    },
+    {
+      "state": "chat-answered",
+      "viewport": "375",
+      "check": "no horizontal overflow",
+      "ok": true,
+      "detail": "(scrollWidth 375 vs viewport 375)"
+    },
+    {
+      "state": "all",
+      "viewport": "all",
+      "check": "zero console errors outside injected-failure states",
+      "ok": true,
+      "detail": "(0 found)"
+    }
+  ],
+  "console_errors": [
+    {
+      "state": "375",
+      "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "injected": true
+    },
+    {
+      "state": "768",
+      "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "injected": true
+    },
+    {
+      "state": "1280",
+      "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "injected": true
+    }
+  ]
+}

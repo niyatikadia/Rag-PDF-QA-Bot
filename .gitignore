@@ -39,7 +39,14 @@ htmlcov/
 .day2/backup/
 *.day2fix
 *.before-day3
+*.before-day6
 .day2/*.out
+
+# Day 6 harnesses follow the same rule: the scripts and their transcripts are
+# committed, the corpus backup taken before the clean-state wipe is not.
+.day6/backup/
+.day6/*.out
+.day6/*.log
 
 # Audit report generated against the project (post-coding Day 6). It is a
 # working document about the repository rather than part of the application,

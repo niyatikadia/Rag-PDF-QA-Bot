@@ -1,0 +1,123 @@
+Functional probe transcript - post-coding Day 6, stage 1.
+Run against a COMPLETELY WIPED backend/data (clean-state gate, stages 5-7):
+the directory was deleted entirely, the backend cold-started, and every check
+below ran against a system that started from nothing.
+
+Real Ollama calls (llama3.2:latest), real Tesseract, real ChromaDB.
+Reproduce with:  backend/.venv/Scripts/python.exe .day6/functional_probe.py
+
+Functional probe against http://127.0.0.1:8000
+Fixtures: C:\RAGPDFQABOT\pdf-rag-chatbot\backend\tests\fixtures
+
+==============================================================================
+F20  HEALTH CHECK - all services reported
+==============================================================================
+  [PASS] F20    health reports status
+  [PASS] F20    health reports ollama_available
+  [PASS] F20    health reports chroma_available
+  [PASS] F20    health reports embedding_model_loaded
+  [PASS] F20    health reports ocr_available
+  [PASS] F20    health reports database_available
+  [PASS] F20    status is ok with every dependency up
+         {"ollama_available": true, "chroma_available": true, "embedding_model_loaded": true, "ocr_available": true, "database_available": true}
+  [PASS] F20    version is reported
+         1.1.0
+
+==============================================================================
+F17  UPLOAD VALIDATION - type, MIME, size, empty
+==============================================================================
+  [PASS] F17    non-.pdf extension rejected with 400
+         Only .pdf files are accepted.
+  [PASS] F17    wrong declared MIME rejected with 400
+         MIME type must be application/pdf.
+  [PASS] F17    empty file rejected with 400
+         Uploaded file is empty.
+  [PASS] F17    file over MAX_FILE_SIZE_MB rejected with 400
+         File exceeds the 20 MB limit.
+  [PASS] F17    file just under the limit is accepted (boundary)
+         19.0 MB -> 202
+
+==============================================================================
+F1/F2/F2b  INGESTION - native, scanned (OCR), mixed, unreadable
+==============================================================================
+  [PASS] F1/F2  native PDF reaches 'ready'
+  [PASS] F2     page count recorded
+         1
+  [PASS] F4     chunks produced
+         1
+  [PASS] F2     native PDF used no OCR
+         0
+  [PASS] F2b    image-only PDF reaches 'ready' via OCR
+  [PASS] F2b    ocr_pages_count > 0 for the scanned document
+         1
+  [PASS] F2b    mixed document OCRs only the pages that need it
+         2 of 4 pages via OCR
+  [PASS] F16    PDF with no text by either method is marked 'failed'
+         failed
+  [PASS] F16    failure message says OCR was tried too
+         No text could be extracted from this PDF, even with OCR. It may be a corrupted file or contain no readable content.
+  [PASS] SEC    failure message discloses no server path or document id
+         No text could be extracted from this PDF, even with OCR. It may be a corrupted file or contain no readable content.
+  [PASS] F1     multiple documents coexist (5 uploaded this run)
+         5 documents created
+
+==============================================================================
+F14  DOCUMENT MANAGEMENT - list, get, 404s
+==============================================================================
+  [PASS] F14    list returns every uploaded document
+         5 listed
+  [PASS] F14    list carries status, pages, chunks and OCR count
+  [PASS] F14    single document fetch returns 200
+  [PASS] F18    unknown document id returns 404
+  [PASS] F18    deleting an unknown document returns 404
+
+==============================================================================
+F17  QUESTION VALIDATION - empty, whitespace, over-length
+==============================================================================
+         (ask took 0.0s -> 400)
+  [PASS] F17    empty question returns 400
+         (ask took 0.0s -> 400)
+  [PASS] F17    whitespace-only question returns 400
+         (ask took 0.0s -> 422)
+  [PASS] F17    question over 2000 characters returns 422
+
+==============================================================================
+F7-F11  RETRIEVAL, GENERATION, CITATIONS, NOT-FOUND
+==============================================================================
+         (ask took 172.4s -> 200)
+  [PASS] F9     grounded answer returned for an answerable question
+  [PASS] F10    answer carries at least one citation
+         [{"filename": "native_multi.pdf", "pages": [1, 3], "relevance_score": 0.7824, "extraction_method": "native"}]
+  [PASS] F10    citation names a file and page numbers
+  [PASS] F8     processing time is reported
+         172208 ms
+         answer: According to the retrieved context, page one of the document "native_multi.pdf" talks about the history of artificial intelligence and machine learning research since the 1950s.
+         (ask took 40.2s -> 200)
+  [PASS] F2b    question answerable only from OCR'd text succeeds
+  [PASS] F10    OCR-derived citation is tagged extraction_method='ocr'
+         {'ocr'}
+         answer: The keyword for retrieval testing in the scanned document was "PINEAPPLE OCR SUCCESS". 
+
+(Source: scanned_image_only.pdf, Page 1 [OCR])
+         (ask took 24.8s -> 200)
+  [PASS] F11    unanswerable question returns a 'not found' answer, not an invention
+         I could not find an answer to that in your uploaded documents.
+
+==============================================================================
+F14  DELETE - file, record and vectors removed together
+==============================================================================
+  [PASS] F14    delete returns 200
+  [PASS] F14    deleted document is gone from the catalogue
+         (ask took 0.1s -> 200)
+  [PASS] F14    deleted document's vectors are gone (scoped query retrieves nothing)
+         I could not find an answer to that in your uploaded documents.
+
+==============================================================================
+CLEANUP - removing documents created by this probe
+==============================================================================
+  4 removed; 0 document(s) left in the system
+
+==============================================================================
+SUMMARY
+==============================================================================
+  42 passed, 0 failed, 42 checks total

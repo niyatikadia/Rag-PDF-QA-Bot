@@ -1,0 +1,54 @@
+{
+  "backend_pid": "10400",
+  "rss_start_mb": 137.6,
+  "idle": {
+    "documents": {
+      "endpoint": "/api/documents",
+      "duration_s": 10,
+      "requests": 1295,
+      "requests_per_second": 129.5,
+      "errors": 0,
+      "p50_ms": 5.98,
+      "p95_ms": 15.18,
+      "p99_ms": 18.34,
+      "max_ms": 309.61
+    },
+    "health": {
+      "endpoint": "/api/health",
+      "duration_s": 10,
+      "requests": 85,
+      "requests_per_second": 8.5,
+      "errors": 0,
+      "p50_ms": 110.27,
+      "p95_ms": 168.02,
+      "p99_ms": 280.31,
+      "max_ms": 280.31
+    }
+  },
+  "under_load": {
+    "documents": {
+      "endpoint": "/api/documents",
+      "duration_s": 20,
+      "requests": 1655,
+      "requests_per_second": 82.8,
+      "errors": 0,
+      "p50_ms": 7.1,
+      "p95_ms": 20.74,
+      "p99_ms": 44.11,
+      "max_ms": 1325.28
+    }
+  },
+  "concurrent_answer": {
+    "status": 200,
+    "seconds": 94.9
+  },
+  "memory_floor_mb": [
+    145.7,
+    146.3,
+    146.6,
+    146.9,
+    147.2
+  ],
+  "memory_growth_mb": 1.5,
+  "memory_verdict": "no sustained growth"
+}

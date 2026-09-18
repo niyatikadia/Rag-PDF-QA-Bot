@@ -1,0 +1,78 @@
+UI/UX state matrix - post-coding Day 6, stage 10.
+8 states x 3 viewports (375 / 768 / 1280 px). Horizontal overflow is measured
+(scrollWidth vs viewport), not eyeballed; console errors are collected per state.
+Screenshots: docs/ui-verification/
+Reproduce:  .venv-tools/Scripts/python.exe .day6/ui_state_matrix.py
+(needs PLAYWRIGHT_BROWSERS_PATH set to .venv-tools/ms-playwright)
+
+
+=== viewport 375px ===
+  [PASS]  375px  documents-empty      no horizontal overflow (scrollWidth 375 vs viewport 375)
+  [PASS]  375px  documents-empty      empty state is explained, not blank 
+  [PASS]  375px  documents-error      no horizontal overflow (scrollWidth 375 vs viewport 375)
+  [PASS]  375px  documents-error      invalid file is refused with a visible message 
+  [PASS]  375px  documents-uploading  no horizontal overflow (scrollWidth 375 vs viewport 375)
+  [PASS]  375px  documents-ready      no horizontal overflow (scrollWidth 375 vs viewport 375)
+  [PASS]  375px  documents-ready      OCR badge shown for OCR-derived documents 
+  [PASS]  375px  documents-ready      per-document OCR page count shown 
+  [PASS]  375px  chat-empty           no horizontal overflow (scrollWidth 375 vs viewport 375)
+  [PASS]  375px  chat-empty           chat empty state explains what to do 
+  [PASS]  375px  chat-empty           keyboard focus reaches an interactive element (first Tab -> TEXTAREA)
+
+=== viewport 768px ===
+  [PASS]  768px  documents-empty      no horizontal overflow (scrollWidth 768 vs viewport 768)
+  [PASS]  768px  documents-empty      empty state is explained, not blank 
+  [PASS]  768px  documents-error      no horizontal overflow (scrollWidth 768 vs viewport 768)
+  [PASS]  768px  documents-error      invalid file is refused with a visible message 
+  [PASS]  768px  documents-uploading  no horizontal overflow (scrollWidth 768 vs viewport 768)
+  [PASS]  768px  documents-ready      no horizontal overflow (scrollWidth 768 vs viewport 768)
+  [PASS]  768px  documents-ready      OCR badge shown for OCR-derived documents 
+  [PASS]  768px  documents-ready      per-document OCR page count shown 
+  [PASS]  768px  chat-empty           no horizontal overflow (scrollWidth 768 vs viewport 768)
+  [PASS]  768px  chat-empty           chat empty state explains what to do 
+  [PASS]  768px  chat-empty           keyboard focus reaches an interactive element (first Tab -> TEXTAREA)
+
+=== viewport 1280px ===
+  [PASS] 1280px  documents-empty      no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  documents-empty      empty state is explained, not blank 
+  [PASS] 1280px  documents-error      no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  documents-error      invalid file is refused with a visible message 
+  [PASS] 1280px  documents-uploading  no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  documents-ready      no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  documents-ready      OCR badge shown for OCR-derived documents 
+  [PASS] 1280px  documents-ready      per-document OCR page count shown 
+  [PASS] 1280px  chat-empty           no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  chat-empty           chat empty state explains what to do 
+  [PASS] 1280px  chat-empty           keyboard focus reaches an interactive element (first Tab -> TEXTAREA)
+
+=== failure and loading states (transport intercepted) ===
+  [PASS]  375px  chat-loading         no horizontal overflow (scrollWidth 375 vs viewport 375)
+  [PASS]  375px  chat-loading         escalating loading indicator is shown (['Searching your documents'])
+  [PASS]  375px  chat-error           no horizontal overflow (scrollWidth 375 vs viewport 375)
+  [PASS]  375px  chat-error           failure is surfaced with an actionable message 
+  [PASS]  375px  chat-error           failed turn offers Retry rather than vanishing 
+  [PASS]  768px  chat-loading         no horizontal overflow (scrollWidth 768 vs viewport 768)
+  [PASS]  768px  chat-loading         escalating loading indicator is shown (['Searching your documents'])
+  [PASS]  768px  chat-error           no horizontal overflow (scrollWidth 768 vs viewport 768)
+  [PASS]  768px  chat-error           failure is surfaced with an actionable message 
+  [PASS]  768px  chat-error           failed turn offers Retry rather than vanishing 
+  [PASS] 1280px  chat-loading         no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  chat-loading         escalating loading indicator is shown (['Searching your documents'])
+  [PASS] 1280px  chat-error           no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  chat-error           failure is surfaced with an actionable message 
+  [PASS] 1280px  chat-error           failed turn offers Retry rather than vanishing 
+
+=== answered state (one real generation) ===
+  [PASS] 1280px  chat-loading         no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  chat-answered        no horizontal overflow (scrollWidth 1280 vs viewport 1280)
+  [PASS] 1280px  chat-answered        answer renders with a citation card 
+  [PASS]  768px  chat-answered        no horizontal overflow (scrollWidth 768 vs viewport 768)
+  [PASS]  375px  chat-answered        no horizontal overflow (scrollWidth 375 vs viewport 375)
+
+=== CONSOLE ERRORS ===
+  none in any state the application is expected to succeed in
+  (3 logged during the deliberately-injected 503 - the browser reporting the response this harness asked for, in ['1280', '375', '768']px chat-error)
+  [PASS]  allpx  all                  zero console errors outside injected-failure states (0 found)
+
+54 passed, 0 failed, 54 checks in 205s
+Screenshots: C:\RAGPDFQABOT\pdf-rag-chatbot\docs\ui-verification
