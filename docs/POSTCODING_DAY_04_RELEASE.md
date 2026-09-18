@@ -190,6 +190,15 @@ not open work. Eight lines across four documents contain `C:\RAGPDFQABOT\…` �
 a drive-root project folder that discloses no username and no personal directory
 structure. Published deliberately.
 
+> **Correction (post-coding Day 6).** That sweep covered `docs/` only. The same
+> commit also published `.day2/perf_coldstart.ps1` and `.day2/security_probe.py`,
+> both of which hard-coded absolute paths from this machine — so the count above
+> was an undercount of the repository, not just of the documents. The two scripts
+> now derive their paths from the checkout (Day 6 §2.4), and no executable file
+> in the repository contains a machine-specific absolute path. The remaining
+> occurrences are nine lines across five `docs/` files, still published
+> deliberately. See `POSTCODING_DAY_06_COMPLETION.md` §2.4.
+
 ### 1.7 Not pushed
 
 **The commits were built and audited locally; the push was deliberately not

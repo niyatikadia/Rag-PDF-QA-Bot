@@ -100,17 +100,28 @@ There is **exactly one citation per file**, and citations arrive sorted by
 
 ## `GET /`
 
-Liveness only. Returns `200`:
+**Two different responses, depending on how the backend was started.**
+
+In **development**, or in any run where `FRONTEND_DIST_DIR` holds no `index.html`, the
+backend serves only the API and `/` is a liveness message:
 
 ```json
 { "message": "PDF RAG Chatbot API is running. Visit /docs for the API reference." }
 ```
 
+In **production** — where `npm run build` has produced a bundle — the backend also serves
+the built frontend, and `/` returns that application's HTML shell instead. The same
+catch-all answers any client-side route (`/chat`, `/documents`) so a page refresh does not
+404. One exception is deliberate: an unmatched path beginning `api/` is re-raised as a
+real `404` rather than falling through to the shell, because returning HTML with a `200`
+for a mistyped endpoint would surface in the client as a JSON parse error instead of a
+clear not-found.
+
 ---
 
 ## `GET /api/health`
 
-Probes all four dependencies and returns `200` **regardless of their state** — the body,
+Probes all five dependencies and returns `200` **regardless of their state** — the body,
 not the status code, carries the verdict. A monitoring check should read `status`.
 
 ```json
@@ -120,17 +131,27 @@ not the status code, carries the verdict. A monitoring check should read `status
   "chroma_available": true,
   "embedding_model_loaded": true,
   "ocr_available": true,
+  "database_available": true,
+  "uptime_seconds": 56.7,
+  "version": "1.1.0",
   "details": { "note": "ocr_available=false means Tesseract is not installed — …" }
 }
 ```
 
 | Field | Meaning |
 |---|---|
-| `status` | `ok` when Ollama **and** ChromaDB **and** the embedding model are all up; otherwise `degraded`. |
+| `status` | `ok` when Ollama **and** ChromaDB **and** the embedding model **and** the database are all up; otherwise `degraded`. |
 | `ocr_available` | Tesseract reachable. **Deliberately not part of `status`** — OCR is a fallback, and the app is fully usable for native PDFs without it. |
+| `database_available` | SQLite at `DATABASE_PATH` answered a `SELECT 1`. Checked with the standard library directly rather than through the application's own connection, so it tests the file rather than a cached handle. Required field, no default — a missing value is a schema error at the router, not a silent `null`. |
+| `uptime_seconds` | Seconds since the process started. Distinguishes a stable process from one that has been silently restarting. |
+| `version` | The running release, read from `app.__version__`. Answers "I deployed, but am I hitting the new code?". |
 
-**Cost.** This endpoint makes a real HTTP call to Ollama, a ChromaDB heartbeat and a
-Tesseract subprocess spawn (~47 ms). It is not free; do not poll it aggressively.
+**Cost.** This endpoint makes a real HTTP call to Ollama, a ChromaDB heartbeat, a SQLite
+query and a Tesseract subprocess spawn. Measured at **p50 110 ms, 8.5 requests per second**
+on the reference hardware, against 129.5 req/s for `GET /api/documents`. It is a
+diagnostic, not a liveness ping — do not poll it aggressively.
+`scripts/health-monitor.ps1` polls it on a schedule and alerts on `degraded`,
+unreachable, or unusually slow.
 
 ---
 

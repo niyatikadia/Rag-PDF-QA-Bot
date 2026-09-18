@@ -23,6 +23,8 @@ sentence-transformers (all-MiniLM-L6-v2) · ChromaDB · SQLite · React + Vite +
 > | B — Hardening | [`POSTCODING_DAY_02_HARDENING.md`](docs/POSTCODING_DAY_02_HARDENING.md) | 9 defects found and fixed; performance, security, UI/UX, configuration |
 > | C — Consolidation | [`POSTCODING_DAY_03_CONSOLIDATION.md`](docs/POSTCODING_DAY_03_CONSOLIDATION.md) | Lint/type clean, docs reconciled, fresh-env install proven, production build verified |
 > | D — Release | [`POSTCODING_DAY_04_RELEASE.md`](docs/POSTCODING_DAY_04_RELEASE.md), [`CHANGELOG.md`](CHANGELOG.md), [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Layered history, v1.0.0 tagged, deployed and verified in production mode |
+> | E — Operations | [`POSTCODING_DAY_05_OPERATIONS.md`](docs/POSTCODING_DAY_05_OPERATIONS.md) | Production smoke test, structured logging, request middleware, health check extended to five dependencies |
+> | Completion | [`POSTCODING_DAY_06_COMPLETION.md`](docs/POSTCODING_DAY_06_COMPLETION.md) | Tests decoupled from live data, OCR/failure ingestion tests added, dependency CVE audit, throughput and memory measured, UI state matrix captured, docs reconciled |
 >
 > **Deployed** means: production mode, one process serving both the API and the built
 > frontend on `127.0.0.1:8000`, interactive API docs not mounted, verified with a real
@@ -31,7 +33,12 @@ sentence-transformers (all-MiniLM-L6-v2) · ChromaDB · SQLite · React + Vite +
 > network. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the reasoning, the
 > persistence plan and the rollback plan.
 >
-> Monitoring and maintenance (phase E) have **not** been done. See
+> **What "monitored" means here, precisely.** The service emits structured JSON
+> logs in production, logs every request with its status and duration, and
+> reports the health of all five dependencies plus uptime and version on
+> `/api/health`. A scheduled health check with a failure alert ships in
+> [`scripts/health-monitor.ps1`](scripts/health-monitor.ps1). There is **no
+> metrics dashboard and no time-series store** — see
 > [Known limitations](#known-limitations).
 
 ---
@@ -281,7 +288,7 @@ the written equivalent.
 | `GET` | `/api/documents/{id}` | — | **200** `DocumentInfo` | **404** unknown id |
 | `DELETE` | `/api/documents/{id}` | — | **200** `{message, document_id}` | **404** unknown id |
 | `POST` | `/api/chat/ask` | `{question, document_id?}` | **200** `{answer, citations[], processing_time_ms}` | **400** empty question · **422** over 2000 chars · **503** Ollama unreachable or timed out · **500** unexpected |
-| `GET` | `/api/health` | — | **200** `{status, ollama_available, chroma_available, embedding_model_loaded, ocr_available, details}` | — |
+| `GET` | `/api/health` | — | **200** `{status, ollama_available, chroma_available, embedding_model_loaded, ocr_available, database_available, uptime_seconds, version, details}` | — |
 
 `DocumentInfo` is `{document_id, filename, upload_date, status, total_pages,
 total_chunks, ocr_pages_count, error_message}` where `status` is
@@ -304,16 +311,20 @@ Two behaviours worth calling out:
 
 ## Environment variables
 
-All 17 live in `backend/.env`; `backend/.env.example` documents every one of them
+All 20 live in `backend/.env`; `backend/.env.example` documents every one of them
 inline and is a working configuration as-is. No secrets — the project uses no paid
-services and no external APIs.
+services and no external APIs. [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) is
+the full reference; this table is the summary.
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `APP_ENV` | `development` | `development` or `production`. In production the interactive API docs are not mounted and the backend serves the built frontend |
+| `LOG_LEVEL` | `INFO` | `CRITICAL`, `ERROR`, `WARNING`, `INFO` or `DEBUG` |
+| `FRONTEND_DIST_DIR` | `../frontend/dist` | Where `npm run build` writes the bundle. Resolved against `backend/`, not the working directory |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Where Ollama is listening. The literal IPv4 address is deliberate — see the note below the table |
 | `OLLAMA_MODEL` | `llama3.2:latest` | The generation model — see [Choosing a model](#choosing-a-model) |
 | `OLLAMA_TIMEOUT_SECONDS` | `300` | Generation timeout before a 503; covers cold model loading |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | sentence-transformers model (384-dim) |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | sentence-transformers model (384-dim). **Point this only at a model you trust** — see [Security](#security) |
 | `CHROMA_PERSIST_DIR` | `./data/chroma_db` | ChromaDB storage |
 | `UPLOAD_DIR` | `./data/uploads` | Uploaded PDFs, stored under generated UUIDs |
 | `DATABASE_PATH` | `./data/pdf_chatbot.db` | SQLite metadata database |
@@ -351,7 +362,7 @@ From `backend/`, with the virtual environment active:
 pytest tests/ -v
 ```
 
-**167 tests across ten modules** (all passing as of post-coding Day 4):
+**184 tests across twelve modules**, all passing:
 
 | Module | Tests | Covers |
 |---|---|---|
@@ -360,32 +371,34 @@ pytest tests/ -v
 | `test_production_mode.py` | 21 | `APP_ENV`/`LOG_LEVEL` validation, API docs absent in production, SPA fallback, static path-traversal containment |
 | `test_config_validation.py` | 17 | Startup range/type checking of every numeric setting |
 | `test_text_cleaner.py` | 10 | Normalisation, control characters, header/footer stripping |
-| `test_retriever.py` | 8 | Ranking, scoring, document scoping *(needs the fixture corpus — see below)* |
+| `test_retriever.py` | 9 | Ranking, scoring, document scoping, OCR chunk retrieval |
+| `test_monitoring.py` | 9 | Health database/uptime/version fields, request middleware, JSON log formatter |
+| `test_ingestion_pipeline.py` | 7 | End-to-end ingestion: OCR fallback, mixed documents, the `failed` path, large and repeated-header PDFs |
 | `test_chunker.py` | 6 | Chunk size, overlap, metadata propagation |
 | `test_ocr_processor.py` | 5 | OCR fallback, disabled/unavailable degradation |
 | `test_embedder.py` | 4 | Embedding shape and determinism |
 | `test_concurrency.py` | 3 | Handlers run in the threadpool, so one question cannot freeze the server |
 
-No running Ollama is required — every test that would call the model stubs
-`llm_service.call_ollama`, so retrieval, context construction and citation extraction all
-still run for real while the suite stays fast and deterministic. No real Tesseract call is
-made either.
+**The suite is self-contained.** It needs no running Ollama — every test that would
+call the model stubs `llm_service.call_ollama`, so retrieval, context construction and
+citation extraction all still run for real while the suite stays fast and deterministic.
 
-**`test_retriever.py` needs a corpus.** It asserts measured similarity scores against
-three documents that must be present in ChromaDB: `native_single.pdf`, `native_multi.pdf`
-and `scanned_image_only.pdf` — 5 chunks in total. On a fresh clone the store is empty, so
-those tests will fail with a message telling you exactly what to upload. Restore it by
-starting the backend and uploading the three committed fixtures:
+It also needs nothing uploaded first. `tests/conftest.py` points the vector store and the
+SQLite catalogue at throwaway directories for the session and rebuilds its corpus from the
+committed fixture PDFs through the real ingestion pipeline. That means the suite never
+reads or writes your actual documents, and uploading anything through the application
+cannot turn it red. (Before this it asserted against whatever happened to be in
+`backend/data/chroma_db/`, so a fourth uploaded document broke it.)
 
-```bash
-curl -F "file=@tests/fixtures/native_single.pdf" http://localhost:8000/api/documents/upload
-curl -F "file=@tests/fixtures/native_multi.pdf" http://localhost:8000/api/documents/upload
-curl -F "file=@tests/fixtures/scanned_image_only.pdf" http://localhost:8000/api/documents/upload
-```
+The fixture PDFs are committed rather than regenerated precisely so the measured
+similarity thresholds stay reproducible — same bytes, same extracted text, same
+embeddings, same scores. `tests/fixtures/make_fixtures.py` regenerates all eight if you
+ever need to, with the caveat that a different PyMuPDF version can shift those scores.
 
-(Or just drag them onto the Documents page.) The fixture PDFs are committed rather than
-regenerated precisely so those thresholds stay reproducible; `tests/fixtures/make_fixtures.py`
-regenerates all eight of them if you ever need to.
+**Tesseract is optional for the suite.** `test_ocr_processor.py` patches it entirely. The
+tests that exercise the real OCR path — the scanned fixture in `test_retriever.py` and
+`test_ingestion_pipeline.py` — skip with a stated reason when Tesseract is not installed,
+rather than failing as though the code were broken.
 
 ---
 
@@ -395,27 +408,36 @@ regenerates all eight of them if you ever need to.
 pdf-rag-chatbot/
 ├── backend/
 │   ├── app/
+│   │   ├── __init__.py  __version__ — the single source of the version
 │   │   ├── main.py, config.py
 │   │   ├── models/      schemas.py, database.py
 │   │   ├── routers/     documents.py, chat.py, health.py
 │   │   ├── services/    pdf_processor, text_cleaner, chunker, embedder,
 │   │   │                vector_store, retriever, llm_service, ocr_processor
 │   │   └── utils/       helpers.py
-│   ├── tests/           9 test modules + fixtures/ (8 PDFs + make_fixtures.py)
+│   ├── tests/           conftest.py + 12 test modules
+│   │                    fixtures/ (8 PDFs + make_fixtures.py)
 │   ├── data/            uploads/, chroma_db/, pdf_chatbot.db   (git-ignored)
 │   ├── requirements.txt, .env.example, pyproject.toml
 ├── frontend/
+│   ├── public/          favicon.ico
 │   ├── src/             App, main, 2 pages, 9 components, api.js, useChat.js
-│   └── .prettierrc, vite.config.js, tailwind.config.js
+│   └── .prettierrc, eslint.config.mjs, vite.config.js, tailwind.config.js
+├── scripts/             start-production.ps1, health-monitor.ps1
+├── docs/                ARCHITECTURE, API_REFERENCE, CONFIGURATION, DEPLOYMENT,
+│                        SESSION_02 … SESSION_10, POSTCODING_DAY_01 … 06,
+│                        FINAL_PROJECT_COMPLETION, ui-verification/ (24 captures)
+├── .day2/ .day3/ .day6/ post-coding harnesses and their recorded output
 ├── .gitattributes       line-ending policy (LF in the repository)
-└── docs/                ARCHITECTURE, API_REFERENCE, CONFIGURATION,
-                         SESSION_02 … SESSION_10, POSTCODING_DAY_01 … 03,
-                         FINAL_PROJECT_COMPLETION
+├── CHANGELOG.md
+└── README.md
 ```
 
 16 backend app modules, 15 frontend modules — matching spec §15. The test suite has grown
-from the 7 modules spec §15 lists to 9: `test_config_validation.py` and
-`test_concurrency.py` were added during post-coding hardening to guard defects found then.
+from the 7 modules spec §15 lists to 12: `test_config_validation.py` and
+`test_concurrency.py` were added during hardening, `test_production_mode.py` at release,
+`test_monitoring.py` in operations, and `test_ingestion_pipeline.py` to cover the OCR and
+failure outcomes spec §19.2 and §32 specify but nothing asserted.
 `PROJECT_SPECIFICATION_v2.md` has the full architecture.
 
 ### Code quality
@@ -439,14 +461,72 @@ records which rule families are deliberately disabled and why.
 
 ---
 
+## Security
+
+The full checklist, its per-item results and the attack attempts behind them are in
+[`POSTCODING_DAY_02_HARDENING.md`](docs/POSTCODING_DAY_02_HARDENING.md) §2 and
+[`POSTCODING_DAY_06_COMPLETION.md`](docs/POSTCODING_DAY_06_COMPLETION.md). The parts a
+reader should know before running it:
+
+**Dependency advisories.** `npm audit` reports **0 vulnerabilities**. `pip-audit` reports
+nine against two *transitive* Python packages — none of the 14 direct pins. Every one was
+traced to the code path it needs:
+
+| Package | Advisories | Reachable here? |
+|---|---|---|
+| `chromadb` 1.5.9 | PYSEC-2026-311, ‑3813, ‑3814, ‑3815 | **No.** All four are vulnerabilities in the ChromaDB **server** — its HTTP API, its `trust_remote_code` collection endpoints and its `SimpleRBACAuthorizationProvider`. This project uses `chromadb.PersistentClient` only: an in-process library with no server, no HTTP API and no auth provider. No fix is published for any of them at any version. |
+| `transformers` 4.57.6 | PYSEC-2025-217, ‑2026-2288, ‑2289, ‑2290, ‑3929 | **No, with one condition.** The app never calls `Trainer`, `save_pretrained`, `AutoModel*` or the X-CLIP/LightGlue paths these need; it loads one model through `SentenceTransformer(EMBEDDING_MODEL)`. PYSEC-2026-2289 (malicious `config.json` → RCE at load) becomes reachable **if you point `EMBEDDING_MODEL` at an untrusted repository**, so treat that variable as security-relevant. Its fix is in transformers 5.3.0, a major version that `sentence-transformers` 3.0.1 does not support. |
+
+Run the audit yourself — it needs no project dependency:
+
+```bash
+python -m venv .venv-tools && .venv-tools/Scripts/pip install pip-audit
+.venv-tools/Scripts/pip-audit -r backend/requirements.txt --desc
+cd frontend && npm audit
+```
+
+**What protects the service.** Uploads are validated on extension, declared MIME and
+size, read in bounded 1 MB chunks so an oversized body cannot exhaust memory before it is
+refused, and stored under a generated UUID — never the user's filename. Retrieved context
+and the user's question are fenced in separate delimiter blocks and declared to be data,
+with fence markers inside retrieved text neutralised and an output-side guard that
+replaces a system-prompt-disclosing answer with the refusal sentence. Ingestion errors are
+sanitised before storage, so no server path or internal id reaches the browser. CORS
+allows exactly one configured origin. In production the static handler resolves every
+requested path and confirms it is inside the bundle before reading it.
+
+**What does not protect it.** There is no authentication, authorisation or HTTPS, by
+design — `--host 127.0.0.1` is the only thing keeping an open upload endpoint off the
+network. All three become mandatory before any network exposure.
+
+---
+
 ## Known limitations
 
 These are recorded deliberately rather than hidden — each is a decision with a reason.
 
-- **Speed is bounded by your hardware.** Answers take 30-75 s on `llama3.2` on an 8 GB
-  machine, and the first request after Ollama starts pays for loading the model. The chat
-  loading indicator escalates its message over time for exactly this reason. Long or
-  repetitive questions can exceed the 300 s timeout and return a 503 on the 8 GB tier.
+- **Speed is bounded by your hardware.** Answers take 25-95 s on `llama3.2` on an 8 GB
+  machine once the model is resident; the first request after Ollama starts additionally
+  pays for loading it, measured at 172 s. The chat loading indicator escalates its
+  message over time for exactly this reason. Long or repetitive questions can exceed the
+  300 s timeout and return a 503 on the 8 GB tier.
+
+  Generation is the only slow part, and it does not block anything else. Measured on the
+  reference machine (i7-7600U, 7.89 GB RAM, Windows 11):
+
+  | Measurement | Idle | While a 94.9 s answer is generating |
+  |---|---|---|
+  | `GET /api/documents` throughput | **129.5 req/s** (p50 5.98 ms, p99 18.34 ms) | **82.8 req/s** (p50 7.10 ms, p99 44.11 ms), 0 errors |
+  | `GET /api/health` throughput | **8.5 req/s** (p50 110.27 ms) | — |
+
+  `/api/health` is deliberately slower: it makes a real HTTP call to Ollama, a ChromaDB
+  heartbeat, a SQLite query and a Tesseract subprocess spawn. It is a diagnostic, not a
+  liveness ping — do not poll it aggressively.
+
+  **No memory leak observed.** Across five cycles of three ingest-and-delete rounds plus
+  fifty reads each, the backend's working set moved from 145.7 MB to 147.2 MB (+1.5 MB),
+  which is a flat floor rather than a rising one. Harness:
+  [`.day6/perf_throughput_memory.py`](.day6/perf_throughput_memory.py).
 
 - **Header/footer stripping considers every line on a page, not only lines at page
   boundaries.** Spec §5.1 describes "repeated short lines at page boundaries"; the
@@ -498,16 +578,11 @@ These are recorded deliberately rather than hidden — each is a decision with a
   single interface. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) §1 for the options
   considered and why each was rejected.
 
-- **Backend dependencies have never been audited for CVEs.** `pip-audit` and `safety`
-  are not installed, so the 14 Python pins have not been checked against an advisory
-  database. Versions are pinned and proven to install cleanly, so reproducibility holds —
-  but this half of the security checklist is genuinely unmet, not passed.
-
-- **Six known frontend dependency advisories**, deliberately not fixed: 1 high + 3
-  moderate in `vite`/`esbuild`, 2 moderate in `react-router`. Every fix is a breaking
-  major upgrade (vite 5→8, react-router 6→7). All four vite/esbuild issues are
-  **dev-server only** and do not affect `vite build` output; both react-router issues are
-  unreachable here (no SSR, no user-controlled navigation targets).
+- **Nine open CVEs in two transitive Python dependencies, none of them reachable here.**
+  `pip-audit` reports 4 advisories against `chromadb` and 5 against `transformers`. Each
+  was checked against this code rather than waved away, and **no fix exists for six of
+  them at any version**. See [Security](#security) for the per-advisory reasoning. This
+  is an honest "not reachable", not a "not checked" — which is what it used to be.
 
 - **Prompt-injection defence stops disclosure, not influence.** The output guard blocks
   verbatim recitation of the system prompt and its fence markers, but a model that
