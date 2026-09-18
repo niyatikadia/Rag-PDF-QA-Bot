@@ -83,6 +83,20 @@ def test_health_endpoint_is_excluded_from_access_log(caplog):
 # ── JSON formatter ──────────────────────────────────────────────────────────
 
 
+def test_request_logging_middleware_is_actually_installed():
+    """
+    The middleware class must be wired into the app, not merely defined.
+
+    The two tests above observe log records, which would also pass if some other
+    logger happened to emit a matching line. This asserts the wiring itself, and
+    gives the imported symbol a reason to be in this module — ruff flagged it as
+    an unused import, and deleting the import would have been the easy answer
+    rather than the useful one.
+    """
+    installed = [m.cls for m in app.user_middleware]
+    assert RequestLoggingMiddleware in installed
+
+
 def test_json_formatter_produces_valid_json():
     formatter = _JSONFormatter()
     record = logging.LogRecord(

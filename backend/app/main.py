@@ -83,11 +83,15 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info("=== PDF RAG Chatbot — Starting up ===")
+    frontend_state = (
+        f"served from {FRONTEND_DIST_DIR}" if SERVING_FRONTEND
+        else "not served (dev server expected)"
+    )
     logger.info(
         "Environment: %s | API docs: %s | Frontend: %s",
         APP_ENV,
         "disabled" if IS_PRODUCTION else "/docs",
-        f"served from {FRONTEND_DIST_DIR}" if SERVING_FRONTEND else "not served (dev server expected)",
+        frontend_state,
     )
 
     # Initialise SQLite schema
