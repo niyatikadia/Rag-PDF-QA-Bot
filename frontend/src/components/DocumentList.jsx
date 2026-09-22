@@ -4,7 +4,7 @@ import DocumentCard from './DocumentCard'
 /**
  * DocumentList — F14. Renders uploaded documents, or an empty state.
  */
-export default function DocumentList({ documents = [], onDelete }) {
+export default function DocumentList({ documents = [], onDelete, onOpen }) {
   if (documents.length === 0) {
     return (
       /* Empty state — shares ChatInterface's tokens (rounded-2xl p-3.5 tile,
@@ -25,7 +25,12 @@ export default function DocumentList({ documents = [], onDelete }) {
   return (
     <div className="flex flex-col gap-2">
       {documents.map(doc => (
-        <DocumentCard key={doc.document_id} document={doc} onDelete={onDelete} />
+        <DocumentCard
+          key={doc.document_id}
+          document={doc}
+          onDelete={onDelete}
+          onOpen={onOpen}
+        />
       ))}
     </div>
   )

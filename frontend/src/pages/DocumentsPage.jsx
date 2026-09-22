@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import FileUpload from '../components/FileUpload'
 import DocumentList from '../components/DocumentList'
+import PdfViewer from '../components/PdfViewer'
 import ErrorToast from '../components/ErrorToast'
 import LoadingIndicator from '../components/LoadingIndicator'
 import { listDocuments, deleteDocument } from '../services/api'
@@ -44,6 +45,11 @@ export default function DocumentsPage() {
   // their own data (found Day 2). Same reasoning as the count below.
   const [initialLoadFailed, setInitialLoadFailed] = useState(false)
   const [ocrLikely, setOcrLikely] = useState(false)
+  // The document being previewed, or null. Holds the document object rather
+  // than an id so the viewer's header can show the filename without looking it
+  // up — and so the modal keeps rendering the name it opened with even if a
+  // poll lands mid-preview.
+  const [viewingDoc, setViewingDoc] = useState(null)
 
   const mountedRef = useRef(true)
   const pollFailuresRef = useRef(0)
@@ -137,6 +143,10 @@ export default function DocumentsPage() {
   const handleDelete = useCallback(
     async documentId => {
       setDocuments(prev => prev.filter(d => d.document_id !== documentId))
+      // Deleting the document being previewed removes the file the iframe is
+      // showing; leaving the modal up would strand the user on a preview of
+      // something that no longer exists.
+      setViewingDoc(prev => (prev?.document_id === documentId ? null : prev))
       try {
         await deleteDocument(documentId)
       } catch (err) {
@@ -232,7 +242,7 @@ export default function DocumentsPage() {
               </p>
             </div>
           ) : (
-            <DocumentList documents={documents} onDelete={handleDelete} />
+            <DocumentList documents={documents} onDelete={handleDelete} onOpen={setViewingDoc} />
           )}
 
           {pollDown && (
@@ -243,6 +253,8 @@ export default function DocumentsPage() {
           )}
         </section>
       </div>
+
+      <PdfViewer document={viewingDoc} onClose={() => setViewingDoc(null)} />
     </div>
   )
 }

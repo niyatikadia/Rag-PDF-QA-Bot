@@ -76,6 +76,29 @@ export async function deleteDocument(documentId) {
   return data
 }
 
+/**
+ * URL of the stored PDF itself — GET /api/documents/{id}/file (Day 12).
+ *
+ * Not an Axios call on purpose. The browser fetches this one itself, as the src
+ * of an iframe or the href of a link, so what the caller needs is the address,
+ * not the bytes: pulling 20 MB through Axios only to wrap it in a blob URL would
+ * buy nothing and cost the whole file in memory.
+ *
+ * Relative, so it rides the same Vite proxy (and the same origin in production)
+ * as every other call here.
+ *
+ * `filename` is appended as a trailing path segment and is ignored by the
+ * backend — the document is found by its id. It is there because Chrome's PDF
+ * viewer falls back to the last segment of the URL when a PDF carries no
+ * `/Title` of its own, so without it such a file displayed as "file" in the
+ * viewer's toolbar and print dialog. Omitted when unknown; the backend serves
+ * the bare path too.
+ */
+export function documentFileUrl(documentId, filename) {
+  const base = `${BASE_URL}/documents/${encodeURIComponent(documentId)}/file`
+  return filename ? `${base}/${encodeURIComponent(filename)}` : base
+}
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 export async function askQuestion(question, documentId = null) {

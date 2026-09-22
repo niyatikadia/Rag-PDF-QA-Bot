@@ -279,6 +279,44 @@ def build_prompt(question: str, context: str) -> str:
 
 # ── Ollama call ──────────────────────────────────────────────────────────────
 
+def _diagnose_ollama_error(body: str) -> str:
+    """
+    Turn Ollama's error body into advice that matches the actual failure.
+
+    Until Day 11 every non-200 produced the same sentence: "check that the model
+    is pulled". That is right for a 404, but it is actively misleading for the
+    failure this machine actually hits — a 500 carrying
+
+        {"error": "timed out waiting for llama-server to start - "}
+
+    which means the model *is* pulled and Ollama could not load it, almost always
+    because RAM ran out (7.89 GB total here, and the embedding model plus Chroma
+    are already resident in the backend process). Sending that user to
+    `ollama pull` wastes their time: the pull succeeds, and the next question
+    fails exactly the same way. Observed live on Day 11 — a request sat for 2.5 h
+    and returned the pull advice.
+
+    Matching is on the body text because Ollama does not distinguish these with
+    status codes: both arrive as a 500 (load failure) or 404 (missing model).
+    """
+    lowered = (body or "").lower()
+
+    if "not found" in lowered or "try pulling" in lowered:
+        return (f"The model '{OLLAMA_MODEL}' is not installed — run "
+                f"`ollama pull {OLLAMA_MODEL}`.")
+
+    if ("timed out waiting for llama-server" in lowered
+            or "requires more system memory" in lowered
+            or "not enough memory" in lowered):
+        return (f"Ollama could not load '{OLLAMA_MODEL}' — this is usually not "
+                "enough free RAM, not a missing model. Close other applications "
+                "and try again, or set OLLAMA_MODEL in backend/.env to a smaller "
+                "model (for example `qwen2.5:3b`).")
+
+    return (f"Check that Ollama is healthy and that the model '{OLLAMA_MODEL}' "
+            f"is pulled (`ollama pull {OLLAMA_MODEL}`).")
+
+
 def call_ollama(prompt: str,
                 system: str = SYSTEM_PROMPT,
                 timeout: int = OLLAMA_TIMEOUT_SECONDS) -> str:
@@ -327,8 +365,7 @@ def call_ollama(prompt: str,
                      response.status_code, response.text[:300])
         raise LLMUnavailableError(
             f"The language model returned an error (HTTP {response.status_code}). "
-            f"Check that the model '{OLLAMA_MODEL}' is pulled "
-            f"(`ollama pull {OLLAMA_MODEL}`)."
+            + _diagnose_ollama_error(response.text)
         )
 
     try:

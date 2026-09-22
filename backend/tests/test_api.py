@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from app.config import UPLOAD_DIR
 from app.main import app
 from app.models import database as db
 from app.services import llm_service
@@ -434,3 +435,168 @@ def test_failed_ingestion_error_message_names_the_upload_not_the_server_path(tmp
         assert "uploads" not in message, f"upload directory leaked: {message}"
     finally:
         db.delete_document(doc_id)
+
+
+# ── GET /api/documents/{id}/file (Day 12) ─────────────────────────────────────
+#
+# The Documents page could list a PDF but never show one: the only way to read
+# an uploaded file was to open backend/data/uploads and match a UUID filename
+# back to a real name by hand. These pin the endpoint the viewer depends on.
+
+@pytest.fixture
+def stored_document():
+    """
+    A record whose file really lives in UPLOAD_DIR, like a genuine upload.
+
+    Deliberately not `temporary_document` above: that one writes into tmp_path,
+    which is outside the upload directory — fine for delete, but it is exactly
+    the case the containment guard refuses, so it cannot test the happy path.
+    """
+    doc_id = f"day12-test-{uuid.uuid4()}"
+    pdf_path = Path(UPLOAD_DIR) / f"{doc_id}.pdf"
+    shutil.copy(FIXTURE_DIR / "native_single.pdf", pdf_path)
+    db.insert_document({
+        "document_id": doc_id,
+        "filename": "viewer_test.pdf",
+        "original_path": str(pdf_path),
+        "upload_timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": "ready",
+    })
+    yield doc_id, pdf_path
+    db.delete_document(doc_id)
+    pdf_path.unlink(missing_ok=True)
+
+
+def test_get_document_file_serves_the_pdf_inline(stored_document):
+    doc_id, pdf_path = stored_document
+
+    response = client.get(f"/api/documents/{doc_id}/file")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    # `inline` is the whole point — `attachment` would download the file
+    # instead of letting the front end's iframe display it.
+    assert response.headers["content-disposition"].startswith("inline")
+    # The *original* name, not the UUID the file is stored under, so saving
+    # from the browser's viewer writes something recognisable.
+    assert "viewer_test.pdf" in response.headers["content-disposition"]
+    assert response.content == pdf_path.read_bytes()
+
+
+def test_get_document_file_404s_for_unknown_document():
+    response = client.get("/api/documents/no-such-document/file")
+    assert response.status_code == 404
+
+
+def test_get_document_file_404s_when_the_file_is_gone(stored_document):
+    """
+    A record can outlive its file — delete_document gives up on a PDF that
+    ingestion still holds open and removes the record's siblings anyway. Serving
+    that must be a clean 404, not an unhandled FileNotFoundError from starlette
+    as it tries to stat the missing path.
+    """
+    doc_id, pdf_path = stored_document
+    pdf_path.unlink()
+
+    response = client.get(f"/api/documents/{doc_id}/file")
+
+    assert response.status_code == 404
+    assert "no longer on disk" in response.json()["detail"]
+
+
+def test_get_document_file_refuses_a_path_outside_the_upload_dir(tmp_path):
+    """
+    `original_path` comes from our own upload handler, so this is defence in
+    depth — but it is the one place a database value becomes a filesystem read
+    driven by a URL, and a row pointing anywhere else must not turn into "serve
+    me any file on this machine".
+    """
+    outside = tmp_path / "not-an-upload.pdf"
+    shutil.copy(FIXTURE_DIR / "native_single.pdf", outside)
+
+    doc_id = f"day12-escape-{uuid.uuid4()}"
+    db.insert_document({
+        "document_id": doc_id,
+        "filename": "escape.pdf",
+        "original_path": str(outside),
+        "upload_timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": "ready",
+    })
+    try:
+        response = client.get(f"/api/documents/{doc_id}/file")
+        assert response.status_code == 404
+        assert response.content != outside.read_bytes()
+    finally:
+        db.delete_document(doc_id)
+
+
+def test_get_document_file_survives_a_non_ascii_filename():
+    """
+    HTTP headers are latin-1. Putting a name like "नमस्ते.pdf" straight into
+    Content-Disposition raises UnicodeEncodeError while the response is being
+    encoded, which fails the whole request — the user gets a 500 for a file that
+    is sitting there perfectly readable. The name degrades; the request does not.
+    """
+    doc_id = f"day12-unicode-{uuid.uuid4()}"
+    pdf_path = Path(UPLOAD_DIR) / f"{doc_id}.pdf"
+    shutil.copy(FIXTURE_DIR / "native_single.pdf", pdf_path)
+    db.insert_document({
+        "document_id": doc_id,
+        "filename": "नमस्ते-café.pdf",
+        "original_path": str(pdf_path),
+        "upload_timestamp": datetime.now(timezone.utc).isoformat(),
+        "status": "ready",
+    })
+    try:
+        response = client.get(f"/api/documents/{doc_id}/file")
+
+        assert response.status_code == 200
+        disposition = response.headers["content-disposition"]
+        assert disposition.startswith("inline")
+        disposition.encode("latin-1")  # must not raise
+    finally:
+        db.delete_document(doc_id)
+        pdf_path.unlink(missing_ok=True)
+
+
+# The filename may also be carried as a trailing path segment, so that Chrome's
+# PDF viewer — which titles its toolbar from the URL's last segment when a PDF
+# has no /Title of its own — shows the document's name instead of the literal
+# word "file". Observed on scanned_image_only.pdf, whose /Title is "".
+
+def test_get_document_file_accepts_a_trailing_filename_segment(stored_document):
+    doc_id, pdf_path = stored_document
+
+    response = client.get(f"/api/documents/{doc_id}/file/viewer_test.pdf")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content == pdf_path.read_bytes()
+
+
+def test_trailing_filename_segment_is_decorative_only(stored_document):
+    """
+    The segment must never select the file — the document id does that. If it
+    were used, this endpoint would become "serve me whatever name I ask for".
+    Every one of these asks for something other than the stored file and must
+    still get the stored file back, byte for byte.
+    """
+    doc_id, pdf_path = stored_document
+    expected = pdf_path.read_bytes()
+
+    # An ordinary name that is simply not this document's must still serve this
+    # document — proving the segment does not select anything.
+    for segment in ("completely-unrelated.pdf", "native_multi.pdf"):
+        response = client.get(f"/api/documents/{doc_id}/file/{segment}")
+        assert response.status_code == 200, segment
+        assert response.content == expected, segment
+
+    # Traversal attempts are normalised by the URL layer before routing, so they
+    # stop being a match for this route at all and come back 404. Either outcome
+    # is safe; what must never happen is *other* content coming back, so that is
+    # what is asserted rather than a particular status.
+    for segment in ("..%2F..%2Fsecrets.pdf", "%2Fetc%2Fpasswd", "....//etc/passwd"):
+        response = client.get(f"/api/documents/{doc_id}/file/{segment}")
+        assert response.status_code in (200, 404), segment
+        if response.status_code == 200:
+            assert response.content == expected, segment

@@ -4,6 +4,7 @@ documents.py — Document upload / list / delete endpoints.
 POST   /api/documents/upload
 GET    /api/documents
 GET    /api/documents/{document_id}
+GET    /api/documents/{document_id}/file
 DELETE /api/documents/{document_id}
 """
 import logging
@@ -13,6 +14,7 @@ from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
 from app.config import UPLOAD_DIR, MAX_FILE_SIZE_BYTES
 from app.models import database as db
@@ -25,6 +27,26 @@ router = APIRouter()
 
 # How much of the body is pulled in at a time by _read_within_limit.
 _UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+def _ascii_filename(filename: str) -> str:
+    """
+    Make a filename safe to put inside a Content-Disposition header.
+
+    Two things would otherwise break the response rather than the download:
+    HTTP headers are latin-1, so a non-ASCII name ("नमस्ते.pdf", "café.pdf")
+    raises UnicodeEncodeError when the header is encoded and the whole request
+    500s; and a name containing a double quote or newline would terminate the
+    quoted string early, which is header injection.
+
+    Dropping to ASCII and stripping quotes/control characters handles both. The
+    name here is cosmetic — it is only what the browser suggests when the user
+    saves from the viewer — so degrading it is the right trade against failing
+    the request. A name that reduces to nothing falls back to "document.pdf".
+    """
+    cleaned = (filename or "").encode("ascii", "ignore").decode("ascii")
+    cleaned = "".join(c for c in cleaned if c.isprintable() and c not in '"\\')
+    return cleaned.strip() or "document.pdf"
 
 
 def _validate_metadata(file: UploadFile) -> None:
@@ -167,6 +189,80 @@ async def get_document(document_id: str) -> DocumentInfo:
         total_chunks=row.get("total_chunks", 0),
         ocr_pages_count=row.get("ocr_pages_count", 0),
         error_message=row.get("error_message"),
+    )
+
+
+# Two paths, one handler. The `/{filename}` variant exists purely so the URL
+# *ends* with the document's name — see the docstring's "Why the filename is in
+# the path". The bare form stays because it is the honest API shape: the id is
+# what identifies the document, and a caller that just wants the bytes should
+# not have to know the name.
+@router.get("/documents/{document_id}/file", tags=["documents"])
+@router.get("/documents/{document_id}/file/{filename}", tags=["documents"])
+async def get_document_file(document_id: str, filename: str | None = None) -> FileResponse:
+    """
+    Serve the stored PDF so the browser can display it (Day 12).
+
+    Added because the Documents page could list a PDF but never show it — the
+    only way to read an uploaded file was to find it on disk under its UUID
+    filename and match that back to a name by hand.
+
+    `Content-Disposition: inline` (not `attachment`) is the point of the
+    endpoint: it asks the browser to render the PDF in its built-in viewer
+    rather than download it, which is what lets the front end put it in an
+    iframe. The original filename is sent back in that header so a "save" from
+    the viewer writes `report.pdf`, not the UUID the file is stored under.
+
+    ── Why the filename is in the path (Day 12, second pass) ──────────────────
+    `filename` is decorative and is deliberately IGNORED: the document is
+    located by `document_id` alone, and the bytes come from the database row's
+    `original_path`. Nothing in the URL ever reaches the filesystem, so the
+    segment cannot be used to reach another file.
+
+    It is there because Chrome's built-in PDF viewer titles its toolbar from the
+    PDF's own `/Title` metadata and, when that is empty, falls back to the last
+    segment of the URL. With the bare route that segment is the literal word
+    "file", so a PDF with no embedded title displayed as "file" in the viewer
+    and in the print dialog — observed on scanned_image_only.pdf, whose /Title
+    is "". Ending the URL with the real name makes that fallback land on
+    something true.
+
+    Status codes:
+      200 — the PDF.
+      404 — no such document, or the record exists but its file is gone (a
+            delete that lost the race with ingestion, see delete_document).
+    """
+    row = db.get_document(document_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    # `original_path` is written by this module's own upload handler, so it is
+    # already trusted — but it is still a value read back out of the database,
+    # and this is the one place it becomes a filesystem read driven by a URL.
+    # Confining it to UPLOAD_DIR means a bad row can never turn into "serve me
+    # any file on the box", and costs one resolve() per request.
+    pdf_path = Path(row["original_path"]).resolve()
+    uploads_root = Path(UPLOAD_DIR).resolve()
+    if not pdf_path.is_relative_to(uploads_root):
+        logger.error("Refusing to serve %s for %s: outside %s",
+                     pdf_path, document_id, uploads_root)
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    if not pdf_path.is_file():
+        logger.warning("Document %s has no file at %s", document_id, pdf_path)
+        raise HTTPException(
+            status_code=404,
+            detail="The file for this document is no longer on disk.",
+        )
+
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        # filename= would send `attachment`, which downloads instead of
+        # displaying; the header is set directly to keep it inline.
+        headers={
+            "Content-Disposition": f'inline; filename="{_ascii_filename(row["filename"])}"'
+        },
     )
 
 

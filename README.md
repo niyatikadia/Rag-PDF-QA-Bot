@@ -286,7 +286,14 @@ the written equivalent.
 | `POST` | `/api/documents/upload` | `multipart/form-data`, field `file` | **202** `{document_id, filename, status, message}` | **400** not `.pdf` / wrong MIME / over 20 MB / empty |
 | `GET` | `/api/documents` | — | **200** `[DocumentInfo]` | — |
 | `GET` | `/api/documents/{id}` | — | **200** `DocumentInfo` | **404** unknown id |
+| `GET` | `/api/documents/{id}/file` <br> `/api/documents/{id}/file/{filename}` | — | **200** the PDF itself, `application/pdf` with `Content-Disposition: inline` | **404** unknown id, or the record exists but its file is gone |
 | `DELETE` | `/api/documents/{id}` | — | **200** `{message, document_id}` | **404** unknown id |
+
+> The `{filename}` on the file route is **decorative and ignored** — the document is
+> located by its id alone, and nothing from the URL reaches the filesystem. It exists
+> because Chrome's PDF viewer titles its toolbar from the PDF's own `/Title` metadata
+> and, when that is empty, falls back to the last segment of the URL — so without it a
+> PDF carrying no title displayed as "file" in the viewer and in the print dialog.
 | `POST` | `/api/chat/ask` | `{question, document_id?}` | **200** `{answer, citations[], processing_time_ms}` | **400** empty question · **422** over 2000 chars · **503** Ollama unreachable or timed out · **500** unexpected |
 | `GET` | `/api/health` | — | **200** `{status, ollama_available, chroma_available, embedding_model_loaded, ocr_available, database_available, uptime_seconds, version, details}` | — |
 

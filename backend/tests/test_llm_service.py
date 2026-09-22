@@ -199,6 +199,40 @@ def test_call_ollama_non_200_raises_llm_unavailable(monkeypatch):
     assert "404" in str(exc.value)
 
 
+# A 500 carrying "timed out waiting for llama-server to start" means the model is
+# installed and Ollama ran out of memory loading it. Before Day 11 this returned
+# the same "run `ollama pull`" advice as a missing model, which sends the user to
+# a command that succeeds and changes nothing. Hit live on Day 11.
+
+def test_call_ollama_load_timeout_blames_memory_not_a_missing_model(monkeypatch):
+    monkeypatch.setattr(
+        requests, "post",
+        lambda *a, **kw: FakeResponse(
+            status_code=500,
+            text='{"error":"timed out waiting for llama-server to start - "}',
+        ))
+
+    with pytest.raises(LLMUnavailableError) as exc:
+        call_ollama("prompt")
+
+    message = str(exc.value)
+    assert "RAM" in message
+    assert "ollama pull" not in message
+
+
+def test_call_ollama_missing_model_still_advises_pull(monkeypatch):
+    monkeypatch.setattr(
+        requests, "post",
+        lambda *a, **kw: FakeResponse(
+            status_code=404,
+            text='{"error":"model \'llama3.2\' not found, try pulling it first"}',
+        ))
+
+    with pytest.raises(LLMUnavailableError) as exc:
+        call_ollama("prompt")
+    assert "ollama pull" in str(exc.value)
+
+
 def test_call_ollama_empty_response_raises_llm_unavailable(monkeypatch):
     monkeypatch.setattr(requests, "post",
                         lambda *a, **kw: FakeResponse(payload={"response": "   "}))

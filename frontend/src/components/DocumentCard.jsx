@@ -1,4 +1,4 @@
-import { Trash2, FileText, CheckCircle2, Clock, XCircle, ScanLine, Layers } from 'lucide-react'
+import { Trash2, Eye, FileText, CheckCircle2, Clock, XCircle, ScanLine, Layers } from 'lucide-react'
 
 /**
  * DocumentCard — F14 document management.
@@ -49,7 +49,7 @@ function formatPages(totalPages, ocrPages) {
   return ocrPages > 0 ? `${base} (${ocrPages} via OCR)` : base
 }
 
-export default function DocumentCard({ document, onDelete }) {
+export default function DocumentCard({ document, onDelete, onOpen }) {
   const {
     document_id,
     filename,
@@ -87,9 +87,17 @@ export default function DocumentCard({ document, onDelete }) {
               whitespace-nowrap, so without it this p's min-content width is the
               full filename and it refuses to shrink, pushing the status and OCR
               pills out of the row instead of ellipsing. */}
-          <p className="min-w-0 text-sm font-medium text-gray-800 truncate" title={filename}>
+          {/* The filename is the obvious thing to click to read the document,
+              so it is the control rather than a decorative <p> with a separate
+              button elsewhere. text-left + truncate because a button centres
+              its text by default and would otherwise ignore the min-w-0 above. */}
+          <button
+            onClick={() => onOpen?.(document)}
+            className="focus-ring min-w-0 text-left text-sm font-medium text-gray-800 truncate rounded hover:text-blue-700 hover:underline transition-colors"
+            title={`Open ${filename}`}
+          >
             {filename}
-          </p>
+          </button>
           <span
             className={`inline-flex items-center gap-1 border rounded-full px-2 py-px text-[10px] font-semibold ${meta.cls}`}
           >
@@ -149,6 +157,19 @@ export default function DocumentCard({ document, onDelete }) {
       {/* gray-500, not gray-400 (Day 2 — contrast): this is an interactive
           control's icon, which WCAG 1.4.11 holds to 3:1. gray-400 on white is
           2.54:1; gray-500 is 4.83:1. */}
+      {/* Clicking the filename does the same thing. The explicit icon is here
+          because a link-styled filename is easy to miss as a control — and it
+          gives the action a stable hit target even when the name is ellipsed
+          down to a few characters. */}
+      <button
+        onClick={() => onOpen?.(document)}
+        className="focus-ring flex-shrink-0 text-gray-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors p-1.5"
+        title={`Open ${filename}`}
+        aria-label={`Open ${filename}`}
+      >
+        <Eye size={16} />
+      </button>
+
       <button
         onClick={() => onDelete?.(document_id)}
         className="focus-ring flex-shrink-0 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors p-1.5"
